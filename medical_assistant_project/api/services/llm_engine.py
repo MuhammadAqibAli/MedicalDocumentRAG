@@ -25,6 +25,11 @@ AVAILABLE_MODELS = {
         "repo_id": "microsoft/Phi-3-mini-4k-instruct",
         "task": "text-generation",
     },
+    "tinyllama-1.1b-chat": {
+        "type": "hf_endpoint",
+        "repo_id": "TinyLlama/TinyLlama-1.1B-Chat-v1.0",
+        "task": "text-generation",
+    },
     # Add more models like Falcon, OpenHermes via endpoint...
     # --- Optional: Local LlamaCpp Configuration ---
     # "llama3-8b-local": {
