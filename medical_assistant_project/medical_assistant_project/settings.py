@@ -60,6 +60,7 @@ INSTALLED_APPS = [
     'rest_framework',           # Django REST Framework for APIs
     'pgvector',                 # Supabase pgvector support
     'django_filters',           # For filtering in DRF views
+    'corsheaders',              # CORS headers for API access
 
     # Your Local Apps
     'api.apps.ApiConfig',       # Reference your api app's config class
@@ -67,6 +68,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'corsheaders.middleware.CorsMiddleware',    # CORS middleware - must be before CommonMiddleware
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -74,6 +76,19 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
+
+# CORS settings
+# For development only - allows all origins
+if DEBUG:
+    CORS_ALLOW_ALL_ORIGINS = True
+else:
+    CORS_ALLOWED_ORIGINS = [
+        "http://localhost:3000",
+        # Add production domains here
+    ]
+
+# If you want to allow credentials (cookies, authorization headers)
+CORS_ALLOW_CREDENTIALS = True
 
 ROOT_URLCONF = 'medical_assistant_project.urls'
 
