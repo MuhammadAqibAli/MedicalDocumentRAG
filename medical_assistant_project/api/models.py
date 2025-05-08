@@ -38,3 +38,31 @@ class GeneratedContent(models.Model):
 
     def __str__(self):
         return f"{self.content_type} on {self.topic} ({self.created_at.date()})"
+
+class StandardType(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    name = models.CharField(max_length=255)
+    is_deleted = models.BooleanField(default=False)
+
+    def __str__(self):
+        return self.name
+
+class Standard(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    standard_title = models.CharField(max_length=255)
+    standard_type = models.ForeignKey(StandardType, on_delete=models.CASCADE, related_name='standards')
+    content = models.TextField()
+    version = models.CharField(max_length=50)
+    generated_content = models.ForeignKey(
+        GeneratedContent, 
+        on_delete=models.SET_NULL, 
+        null=True, 
+        blank=True, 
+        related_name='standards'
+    )
+    is_deleted = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"{self.standard_title} (v{self.version})"

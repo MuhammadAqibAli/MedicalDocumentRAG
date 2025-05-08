@@ -159,3 +159,194 @@ GET /api/generated-content/a1b2c3d4-e5f6-7890-abcd-1234567890ab/ HTTP/1.1
   "created_at": "2024-05-10T15:20:30Z"
 }
 ```
+
+## Medical Standards API
+
+### Create Standard
+
+Create a new medical standard.
+
+**Endpoint:** `POST /api/standards/`
+
+**Request:**
+```json
+{
+  "standard_title": "Diabetes Management Standard",
+  "standard_type": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+  "content": "This standard outlines the procedures for managing diabetes in accordance with NZ healthcare guidelines...",
+  "version": "1.0",
+  "generated_content": null
+}
+```
+
+**Response (Success):**
+```json
+{
+  "id": "e47ac10b-58cc-4372-a567-0e02b2c3d480",
+  "standard_title": "Diabetes Management Standard",
+  "standard_type": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+  "standard_type_name": "Clinical Procedure",
+  "content": "This standard outlines the procedures for managing diabetes in accordance with NZ healthcare guidelines...",
+  "version": "1.0",
+  "generated_content": null,
+  "llm_model_used": null,
+  "is_ai_generated": false,
+  "created_at": "2024-05-15T10:30:45Z",
+  "updated_at": "2024-05-15T10:30:45Z"
+}
+```
+
+### Update Standard
+
+Update an existing medical standard.
+
+**Endpoint:** `PUT /api/standards/{id}/`
+
+**Request:**
+```json
+{
+  "standard_title": "Updated Diabetes Management Standard",
+  "version": "1.1"
+}
+```
+
+**Response (Success):**
+```json
+{
+  "id": "e47ac10b-58cc-4372-a567-0e02b2c3d480",
+  "standard_title": "Updated Diabetes Management Standard",
+  "standard_type": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+  "standard_type_name": "Clinical Procedure",
+  "content": "This standard outlines the procedures for managing diabetes in accordance with NZ healthcare guidelines...",
+  "version": "1.1",
+  "generated_content": null,
+  "llm_model_used": null,
+  "is_ai_generated": false,
+  "created_at": "2024-05-15T10:30:45Z",
+  "updated_at": "2024-05-15T11:15:20Z"
+}
+```
+
+### Delete Standard
+
+Soft delete a medical standard.
+
+**Endpoint:** `DELETE /api/standards/{id}/`
+
+**Response (Success):**
+```
+204 No Content
+```
+
+### Get Standard
+
+Retrieve a specific medical standard by ID.
+
+**Endpoint:** `GET /api/standards/{id}/`
+
+**Response:**
+```json
+{
+  "id": "e47ac10b-58cc-4372-a567-0e02b2c3d480",
+  "standard_title": "Diabetes Management Standard",
+  "standard_type": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+  "standard_type_name": "Clinical Procedure",
+  "content": "This standard outlines the procedures for managing diabetes in accordance with NZ healthcare guidelines...",
+  "version": "1.0",
+  "generated_content": "a1b2c3d4-e5f6-7890-abcd-1234567890ab",
+  "llm_model_used": "llama3-8b-instruct",
+  "is_ai_generated": true,
+  "created_at": "2024-05-15T10:30:45Z",
+  "updated_at": "2024-05-15T10:30:45Z"
+}
+```
+
+### List Standards
+
+Retrieve a list of all medical standards with optional filtering by standard type.
+
+**Endpoint:** `GET /api/standards/`
+
+**Request with filter:**
+```
+GET /api/standards/?standard_type_id=f47ac10b-58cc-4372-a567-0e02b2c3d479
+```
+
+**Response:**
+```json
+[
+  {
+    "id": "e47ac10b-58cc-4372-a567-0e02b2c3d480",
+    "standard_title": "Diabetes Management Standard",
+    "standard_type": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+    "standard_type_name": "Clinical Procedure",
+    "content": "This standard outlines the procedures...",
+    "version": "1.0",
+    "generated_content": "a1b2c3d4-e5f6-7890-abcd-1234567890ab",
+    "llm_model_used": "llama3-8b-instruct",
+    "is_ai_generated": true,
+    "created_at": "2024-05-15T10:30:45Z",
+    "updated_at": "2024-05-15T10:30:45Z"
+  }
+]
+```
+
+**Request without filter (returns all standards):**
+```
+GET /api/standards/
+```
+
+### Search Standards
+
+Search for standards by type or title.
+
+**Endpoint:** `GET /api/standards/search/?standard_type_id={id}&standard_title={title}`
+
+**Request:**
+```
+GET /api/standards/search/?standard_title=Diabetes
+```
+
+**Response:**
+```json
+[
+  {
+    "id": "e47ac10b-58cc-4372-a567-0e02b2c3d480",
+    "standard_title": "Diabetes Management Standard",
+    "standard_type": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+    "standard_type_name": "Clinical Procedure",
+    "content": "This standard outlines the procedures...",
+    "version": "1.0",
+    "generated_content": "a1b2c3d4-e5f6-7890-abcd-1234567890ab",
+    "llm_model_used": "llama3-8b-instruct",
+    "is_ai_generated": true,
+    "created_at": "2024-05-15T10:30:45Z",
+    "updated_at": "2024-05-15T10:30:45Z"
+  }
+]
+```
+
+### List Standard Types
+
+Retrieve a list of all standard types.
+
+**Endpoint:** `GET /api/standard-types/`
+
+**Response:**
+```json
+[
+  {
+    "id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+    "name": "Clinical Procedure"
+  },
+  {
+    "id": "g47ac10b-58cc-4372-a567-0e02b2c3d482",
+    "name": "Clinical Protocol"
+  },
+  {
+    "id": "h47ac10b-58cc-4372-a567-0e02b2c3d483",
+    "name": "Policy"
+  }
+]
+```
+

@@ -1,13 +1,16 @@
-from rest_framework import generics, viewsets, status, views
+from rest_framework import generics, viewsets, status, views, filters
 from rest_framework.response import Response
 from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.exceptions import APIException
 from django_filters.rest_framework import DjangoFilterBackend # For filtering list views
-from .models import Document, GeneratedContent
+from .models import Document, GeneratedContent, Standard, StandardType
 from .serializers import (
     DocumentSerializer,
     GeneratedContentSerializer,
-    ContentGenerationRequestSerializer
+    ContentGenerationRequestSerializer,
+    StandardTypeSerializer,
+    StandardCreateUpdateSerializer,
+    StandardDetailSerializer
 )
 from .services import document_processor, rag_retriever, llm_engine, validator
 from .services.llm_engine import AVAILABLE_MODELS
@@ -162,3 +165,116 @@ class AvailableModelsView(views.APIView):
                 {"error": "Failed to retrieve available models"}, 
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+
+class StandardTypeViewSet(viewsets.ReadOnlyModelViewSet):
+    """
+    API endpoint that allows viewing standard types.
+    """
+    queryset = StandardType.objects.filter(is_deleted=False)
+    serializer_class = StandardTypeSerializer
+
+class MedicalStandardView(views.APIView):
+    """
+    API endpoint for managing medical standards.
+    """
+    
+    def post(self, request, *args, **kwargs):
+        """
+        Save a new medical standard.
+        """
+        serializer = StandardCreateUpdateSerializer(data=request.data)
+        if serializer.is_valid():
+            standard = serializer.save()
+            response_serializer = StandardDetailSerializer(standard)
+            return Response(response_serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+    def put(self, request, standard_id, *args, **kwargs):
+        """
+        Update an existing medical standard.
+        """
+        try:
+            standard = Standard.objects.get(id=standard_id, is_deleted=False)
+        except Standard.DoesNotExist:
+            return Response({"error": "Standard not found"}, status=status.HTTP_404_NOT_FOUND)
+        
+        serializer = StandardCreateUpdateSerializer(standard, data=request.data, partial=True)
+        if serializer.is_valid():
+            updated_standard = serializer.save()
+            response_serializer = StandardDetailSerializer(updated_standard)
+            return Response(response_serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+    def delete(self, request, standard_id, *args, **kwargs):
+        """
+        Soft delete a medical standard.
+        """
+        try:
+            standard = Standard.objects.get(id=standard_id, is_deleted=False)
+        except Standard.DoesNotExist:
+            return Response({"error": "Standard not found"}, status=status.HTTP_404_NOT_FOUND)
+        
+        standard.is_deleted = True
+        standard.save()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+    
+    def get(self, request, standard_id=None, *args, **kwargs):
+        """
+        Get a specific medical standard or list standards filtered by standard_type_id.
+        """
+        if standard_id:
+            try:
+                # Using select_related to perform the JOINs
+                standard = Standard.objects.select_related(
+                    'standard_type', 'generated_content'
+                ).get(id=standard_id, is_deleted=False)
+                serializer = StandardDetailSerializer(standard)
+                return Response(serializer.data)
+            except Standard.DoesNotExist:
+                return Response({"error": "Standard not found"}, status=status.HTTP_404_NOT_FOUND)
+        else:
+            # Get standard_type_id from query parameters
+            standard_type_id = request.query_params.get('standard_type_id')
+            
+            # Start with base queryset
+            queryset = Standard.objects.select_related(
+                'standard_type', 'generated_content'
+            ).filter(is_deleted=False)
+            
+            # Filter by standard_type_id if provided
+            if standard_type_id:
+                queryset = queryset.filter(standard_type_id=standard_type_id)
+                
+            serializer = StandardDetailSerializer(queryset, many=True)
+            return Response(serializer.data)
+
+class StandardSearchView(views.APIView):
+    """
+    API endpoint for searching medical standards.
+    """
+    
+    def get(self, request, *args, **kwargs):
+        """
+        Search standards by type or title.
+        """
+        standard_type_id = request.query_params.get('standard_type_id')
+        standard_title = request.query_params.get('standard_title')
+        
+        if not standard_type_id and not standard_title:
+            return Response(
+                {"error": "Please provide at least one search parameter (standard_type_id or standard_title)"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        queryset = Standard.objects.select_related(
+            'standard_type', 'generated_content'
+        ).filter(is_deleted=False)
+        
+        if standard_type_id:
+            queryset = queryset.filter(standard_type_id=standard_type_id)
+        
+        if standard_title:
+            queryset = queryset.filter(standard_title__icontains=standard_title)
+        
+        serializer = StandardDetailSerializer(queryset, many=True)
+        return Response(serializer.data)
