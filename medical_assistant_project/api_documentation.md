@@ -350,3 +350,61 @@ Retrieve a list of all standard types.
 ]
 ```
 
+### Compare Standards
+
+Compare two standard contents and analyze their differences using LLM.
+
+**Endpoint:** `POST /api/standards/compare/`
+
+**Request:**
+```json
+{
+  "content1": "This standard outlines the procedures for managing diabetes in accordance with NZ healthcare guidelines...",
+  "content2": "This updated standard provides comprehensive guidance for diabetes management, including new insulin protocols...",
+  "standard_type_id": "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+}
+```
+
+**Response (Success):**
+```json
+{
+  "valid": true,
+  "comparison": {
+    "key_differences": [
+      {
+        "aspect": "Insulin Protocol",
+        "document1": "Recommends fixed dosing schedule based on weight",
+        "document2": "Introduces sliding scale approach based on blood glucose readings"
+      },
+      {
+        "aspect": "Monitoring Frequency",
+        "document1": "Suggests blood glucose monitoring 4 times daily",
+        "document2": "Recommends personalized monitoring schedule based on patient risk factors"
+      }
+    ],
+    "recommendation": "Document 2 is better overall as it provides more personalized care approaches and incorporates recent clinical evidence on variable insulin dosing",
+    "improvement_suggestions": [
+      "Both documents could benefit from clearer emergency protocols for hypoglycemia",
+      "Consider adding visual aids or flowcharts for clinical decision-making"
+    ]
+  }
+}
+```
+
+**Response (Invalid Content):**
+```json
+{
+  "valid": false,
+  "message": "First content is not valid for Clinical Procedure",
+  "details": "The content appears to be a general informational text about diabetes rather than a clinical procedure document. It lacks procedural steps, clinical guidance, and the formal structure expected in a procedure document."
+}
+```
+
+**Response (Error):**
+```json
+{
+  "error": "Missing required parameters. Please provide content1, content2, and standard_type_id."
+}
+```
+
+

@@ -7,7 +7,8 @@ from .views import (
     AvailableModelsView,
     MedicalStandardView,
     StandardSearchView,
-    StandardTypeViewSet
+    StandardTypeViewSet,
+    MedicalStandardCompareView
 )
 
 router = DefaultRouter()
@@ -20,6 +21,7 @@ urlpatterns = [
     path('models/', AvailableModelsView.as_view(), name='available-models'),
     path('standards/', MedicalStandardView.as_view(), name='standards-list-create'),
     path('standards/<uuid:standard_id>/', MedicalStandardView.as_view(), name='standard-detail'),
+     path('standards/compare/', MedicalStandardCompareView.as_view(), name='standards-compare'),
     path('standards/search/', StandardSearchView.as_view(), name='standard-search'),
     path('', include(router.urls)), # Include ViewSet URLs
 ]

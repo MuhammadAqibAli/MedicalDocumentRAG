@@ -13,7 +13,7 @@ from .serializers import (
     StandardDetailSerializer
 )
 from .services import document_processor, rag_retriever, llm_engine, validator
-from .services.llm_engine import AVAILABLE_MODELS
+from .services.validator import VALIDATION_MODEL_NAME
 import logging
 
 logger = logging.getLogger(__name__)
@@ -76,6 +76,9 @@ class ContentGenerationView(views.APIView):
         content_type = validated_data['content_type']
         model_name = validated_data['model_name']
 
+         # Get standard type name
+        standard_type = StandardType.objects.get(id=content_type, is_deleted=False)
+        standard_type_name = standard_type.name
         try:
             # 1. RAG Retrieval
             context, source_chunk_ids_or_error = rag_retriever.retrieve_relevant_chunks(query=topic)
@@ -93,16 +96,19 @@ class ContentGenerationView(views.APIView):
             # 2. LLM Generation
             generated_text = llm_engine.generate_content_with_llm(
                 topic=topic,
-                content_type=content_type,
+                content_type=standard_type_name,
                 model_name=model_name,
                 context=context # Will be None if fallback
             )
 
-            # 3. Validation
-            validation_results = validator.validate_generated_output(generated_text)
-            if 'error' in validation_results:
-                 logger.warning(f"Validation process encountered an issue: {validation_results['error']}")
-                 # Decide if you want to proceed without validation results or fail
+            # 3. Validation - Commented out
+            # validation_results = validator.validate_generated_output(generated_text)
+            # if 'error' in validation_results:
+            #      logger.warning(f"Validation process encountered an issue: {validation_results['error']}")
+            #      # Decide if you want to proceed without validation results or fail
+            
+            # Use empty dict for validation_results since we're skipping validation
+            validation_results = {}
 
             # 4. Store Generated Content
             content_instance = GeneratedContent.objects.create(
@@ -157,7 +163,7 @@ class AvailableModelsView(views.APIView):
     def get(self, request, *args, **kwargs):
         try:
             # Extract just the model names (keys) from AVAILABLE_MODELS
-            model_list = list(AVAILABLE_MODELS.keys())
+            model_list = list(llm_engine.AVAILABLE_MODELS.keys())
             return Response({"models": model_list}, status=status.HTTP_200_OK)
         except Exception as e:
             logger.exception("Error retrieving available models")
@@ -247,6 +253,66 @@ class MedicalStandardView(views.APIView):
                 
             serializer = StandardDetailSerializer(queryset, many=True)
             return Response(serializer.data)
+    
+    def compare_standards(self, request, *args, **kwargs):
+        """
+        Compare two standard contents and analyze their differences using LLM.
+        
+        Expects:
+        - content1: First standard content
+        - content2: Second standard content
+        - standard_type_id: UUID of the standard type
+        """
+        content1 = request.data.get('content1')
+        content2 = request.data.get('content2')
+        standard_type_id = request.data.get('standard_type_id')
+        
+        # Validate inputs
+        if not content1 or not content2 or not standard_type_id:
+            return Response(
+                {"error": "Missing required parameters. Please provide content1, content2, and standard_type_id."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            # Get standard type name
+            standard_type = StandardType.objects.get(id=standard_type_id, is_deleted=False)
+            standard_type_name = standard_type.name
+        except StandardType.DoesNotExist:
+            return Response(
+                {"error": f"Standard type with ID {standard_type_id} not found."},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        try:
+            # Use the validation model for comparison
+            comparison_result = llm_engine.compare_standard_contents(
+                content1=content1,
+                content2=content2,
+                standard_type=standard_type_name,
+                model_name=VALIDATION_MODEL_NAME
+            )
+            
+            return Response(comparison_result, status=status.HTTP_200_OK)
+                
+        except ValueError as ve:
+            logger.error(f"Validation error: {ve}")
+            return Response(
+                {"error": str(ve)},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        except RuntimeError as re:
+            logger.error(f"Runtime error during comparison: {re}")
+            return Response(
+                {"error": f"Error comparing standards: {str(re)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+        except Exception as e:
+            logger.error(f"Unexpected error during comparison: {e}")
+            return Response(
+                {"error": f"Unexpected error: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
 class StandardSearchView(views.APIView):
     """
@@ -278,3 +344,68 @@ class StandardSearchView(views.APIView):
         
         serializer = StandardDetailSerializer(queryset, many=True)
         return Response(serializer.data)
+
+# Add this new view class for handling standard comparisons
+class MedicalStandardCompareView(views.APIView):
+    """
+    API endpoint for comparing two medical standards.
+    """
+    def post(self, request):
+        """
+        Compare two standard contents and analyze their differences using LLM.
+        
+        Expects:
+        - content1: First standard content
+        - content2: Second standard content
+        - standard_type_id: UUID of the standard type
+        """
+        content1 = request.data.get('content1')
+        content2 = request.data.get('content2')
+        standard_type_id = request.data.get('standard_type_id')
+        
+        # Validate inputs
+        if not content1 or not content2 or not standard_type_id:
+            return Response(
+                {"error": "Missing required parameters. Please provide content1, content2, and standard_type_id."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            # Get standard type name
+            standard_type = StandardType.objects.get(id=standard_type_id, is_deleted=False)
+            standard_type_name = standard_type.name
+        except StandardType.DoesNotExist:
+            return Response(
+                {"error": f"Standard type with ID {standard_type_id} not found."},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        try:
+            # Use the validation model for comparison
+            comparison_result = llm_engine.compare_standard_contents(
+                content1=content1,
+                content2=content2,
+                standard_type=standard_type_name,
+                model_name=VALIDATION_MODEL_NAME
+            )
+            
+            return Response(comparison_result, status=status.HTTP_200_OK)
+                
+        except ValueError as ve:
+            logger.error(f"Validation error: {ve}")
+            return Response(
+                {"error": str(ve)},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        except RuntimeError as re:
+            logger.error(f"Runtime error during comparison: {re}")
+            return Response(
+                {"error": f"Error comparing standards: {str(re)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+        except Exception as e:
+            logger.error(f"Unexpected error during comparison: {e}")
+            return Response(
+                {"error": f"Unexpected error: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )

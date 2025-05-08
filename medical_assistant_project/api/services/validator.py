@@ -4,7 +4,7 @@ from langchain.prompts import PromptTemplate
 logger = logging.getLogger(__name__)
 
 # Use a smaller/faster model for validation if possible, or reuse a main one
-VALIDATION_MODEL_NAME = "phi-3-mini-instruct" # Example: Use Mistral for validation
+VALIDATION_MODEL_NAME = "phi-3-mini-instruct" # Example: Use Phi-3 for validation
 
 VALIDATION_PROMPT_TEMPLATE = """
 You are an expert reviewer for New Zealand healthcare documents. Evaluate the following generated text based on the criteria below. Respond ONLY with a JSON object containing your assessment. Do not add any introductory text or explanation outside the JSON.
@@ -30,7 +30,7 @@ def validate_generated_output(generated_text: str) -> dict:
     """
     logger.info(f"Starting validation for generated text (length: {len(generated_text)})...")
     try:
-        validator_llm = get_llm_instance(VALIDATION_MODEL_NAME) # Or configure a dedicated validator LLM
+        validator_llm = get_llm_instance(VALIDATION_MODEL_NAME) # Will use fallback if needed
     except Exception as e:
         logger.error(f"Could not initialize validation LLM ({VALIDATION_MODEL_NAME}): {e}")
         return {"error": "Validation LLM unavailable", "details": str(e)}
