@@ -87,7 +87,7 @@ Use the following context from internal documents as your primary source:
 --- CONTEXT END ---
 
 If the context is insufficient or irrelevant to the topic, state that you are generating the content based on your general knowledge while maintaining the NZ healthcare style, but mention that internal document context was not applicable.
-Generate only the {content_type} content based on the topic and context provided.
+Generate only the {content_type} content based on the topic and context provided, provide me the content in CKEditor HTML format.
 """
 
 FALLBACK_PROMPT_TEMPLATE = """
@@ -95,7 +95,7 @@ You are a helpful assistant specialized in creating documents compliant with New
 
 Generate a {content_type} about the following topic: "{topic}"
 
-Generate only the {content_type} content based on the topic provided. Rely on your general knowledge of healthcare best practices, adapted for a New Zealand context where possible.
+Generate only the {content_type} content based on the topic provided. Rely on your general knowledge of healthcare best practices, adapted for a New Zealand context where possible, provide me the content in CKEditor HTML format.
 """
 
 CONTENT_VALIDATION_TEMPLATE = """
