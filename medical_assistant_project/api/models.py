@@ -5,13 +5,13 @@ import uuid
 class Document(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     file_name = models.CharField(max_length=255)
-    document_type = models.CharField(max_length=100, help_text="e.g., Policy, Best Practice, Procedure, Standing Order")
+    standard_type = models.ForeignKey('StandardType', on_delete=models.CASCADE, related_name='documents')
     supabase_storage_path = models.CharField(max_length=1024)
     uploaded_at = models.DateTimeField(auto_now_add=True)
     metadata = models.JSONField(null=True, blank=True) # Optional: Store original metadata
 
     def __str__(self):
-        return f"{self.document_type}: {self.file_name}"
+        return f"{self.standard_type.name}: {self.file_name}"
 
 class DocumentChunk(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)

@@ -5,7 +5,7 @@ from .services.llm_engine import AVAILABLE_MODELS
 class DocumentSerializer(serializers.ModelSerializer):
     class Meta:
         model = Document
-        fields = ['id', 'file_name', 'document_type', 'uploaded_at', 'metadata']
+        fields = ['id', 'file_name', 'standard_type', 'uploaded_at', 'metadata']
         read_only_fields = ['id', 'uploaded_at', 'supabase_storage_path'] # Path is internal
 
 class GeneratedContentSerializer(serializers.ModelSerializer):

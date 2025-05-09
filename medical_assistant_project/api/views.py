@@ -26,15 +26,14 @@ class ServiceUnavailable(APIException):
 class DocumentUploadView(views.APIView):
     parser_classes = (MultiPartParser, FormParser)
 
-
     def post(self, request, *args, **kwargs):
         file_obj = request.FILES.get('file')
-        document_type = request.data.get('document_type')
+        standard_type_id = request.data.get('standard_type_id')
 
         if not file_obj:
             return Response({"error": "File not provided."}, status=status.HTTP_400_BAD_REQUEST)
-        if not document_type:
-            return Response({"error": "Document type not provided."}, status=status.HTTP_400_BAD_REQUEST)
+        if not standard_type_id:
+            return Response({"error": "Standard type ID not provided."}, status=status.HTTP_400_BAD_REQUEST)
 
         # Basic validation for file type (can be enhanced)
         allowed_extensions = ['.pdf', '.docx']
@@ -47,7 +46,7 @@ class DocumentUploadView(views.APIView):
             doc_instance = document_processor.process_and_store_document(
                 file_obj=file_obj,
                 original_filename=file_obj.name,
-                document_type=document_type
+                standard_type_id=standard_type_id
             )
             serializer = DocumentSerializer(doc_instance)
             return Response(serializer.data, status=status.HTTP_201_CREATED)
@@ -61,9 +60,48 @@ class DocumentUploadView(views.APIView):
              logger.error(f"Document processing runtime error: {re}")
              raise ServiceUnavailable(f"Processing error: {re}")
         except Exception as e:
-            logger.exception("Unexpected error during document upload and processing.") # Log full traceback
-            return Response({"error": "An unexpected server error occurred during processing."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            logger.exception("Unexpected error during document upload and processing.")
+            return Response({"error": f"Unexpected error: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+    def get(self, request, document_id=None, *args, **kwargs):
+        """
+        Get all documents or a specific document by ID.
+        If document_id is provided, returns a single document's metadata.
+        Otherwise, returns a list of all documents.
+        """
+        if document_id:
+            return self.view_document_by_id(request, document_id)
+        else:
+            return self.get_all_documents(request)
+
+    def delete(self, request, document_id, *args, **kwargs):
+        """
+        Delete a document by ID, including its file in storage and related chunks.
+        """
+        success, error = document_processor.delete_document(document_id)
+        if error:
+            status_code = status.HTTP_404_NOT_FOUND if "not found" in error else status.HTTP_500_INTERNAL_SERVER_ERROR
+            return Response({"error": error}, status=status_code)
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+    def get_all_documents(self, request):
+        """
+        Returns a list of all uploaded documents with metadata.
+        """
+        documents, error = document_processor.get_all_documents()
+        if error:
+            return Response({"error": error}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return Response(documents, status=status.HTTP_200_OK)
+
+    def view_document_by_id(self, request, document_id):
+        """
+        Retrieves and returns metadata of a single document by its ID.
+        """
+        document_data, error = document_processor.get_document_by_id(document_id)
+        if error:
+            status_code = status.HTTP_404_NOT_FOUND if "not found" in error else status.HTTP_500_INTERNAL_SERVER_ERROR
+            return Response({"error": error}, status=status_code)
+        return Response(document_data, status=status.HTTP_200_OK)
 
 class ContentGenerationView(views.APIView):
     def post(self, request, *args, **kwargs):
@@ -409,3 +447,24 @@ class MedicalStandardCompareView(views.APIView):
                 {"error": f"Unexpected error: {str(e)}"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+
+class DocumentDownloadView(views.APIView):
+    """
+    API endpoint for downloading document files.
+    """
+    def get(self, request, document_id, *args, **kwargs):
+        """
+        Downloads a document file from Supabase storage.
+        """
+        file_content, file_name, content_type, error = document_processor.download_document(document_id)
+        
+        if error:
+            status_code = status.HTTP_404_NOT_FOUND if "not found" in error else status.HTTP_500_INTERNAL_SERVER_ERROR
+            return Response({"error": error}, status=status_code)
+        
+        # Create Django response with file content
+        from django.http import HttpResponse
+        response = HttpResponse(file_content, content_type=content_type)
+        response['Content-Disposition'] = f'attachment; filename="{file_name}"'
+        
+        return response

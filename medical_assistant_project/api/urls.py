@@ -8,7 +8,8 @@ from .views import (
     MedicalStandardView,
     StandardSearchView,
     StandardTypeViewSet,
-    MedicalStandardCompareView
+    MedicalStandardCompareView,
+    DocumentDownloadView
 )
 
 router = DefaultRouter()
@@ -24,4 +25,8 @@ urlpatterns = [
      path('standards/compare/', MedicalStandardCompareView.as_view(), name='standards-compare'),
     path('standards/search/', StandardSearchView.as_view(), name='standard-search'),
     path('', include(router.urls)), # Include ViewSet URLs
+    # Document management endpoints
+    path('documents/', DocumentUploadView.as_view(), name='document-list'),
+    path('documents/<uuid:document_id>/', DocumentUploadView.as_view(), name='document-detail'),
+    path('documents/<uuid:document_id>/download/', DocumentDownloadView.as_view(), name='document-download'),
 ]

@@ -2,7 +2,9 @@
 
 This document provides details about the available API endpoints, including sample requests and responses.
 
-## Document Upload API
+## Document Management API
+
+### Upload Document
 
 Upload medical documents (PDF, DOCX) for processing and storage.
 
@@ -15,7 +17,7 @@ Content-Type: multipart/form-data
 
 {
   "file": [binary file content],
-  "document_type": "Policy"
+  "document_type_id": "f47ac10b-58cc-4372-a567-0e02b2c3d479"
 }
 ```
 
@@ -24,7 +26,7 @@ Content-Type: multipart/form-data
 {
   "id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
   "file_name": "diabetes_management.pdf",
-  "document_type": "Policy",
+  "document_type": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
   "uploaded_at": "2024-05-10T14:30:45Z",
   "metadata": null
 }
@@ -33,7 +35,123 @@ Content-Type: multipart/form-data
 **Response (Error):**
 ```json
 {
-  "error": "Unsupported file type '.txt'. Only PDF and DOCX allowed."
+  "error": "Standard type with ID f47ac10b-58cc-4372-a567-0e02b2c3d479 not found."
+}
+```
+
+### List Documents
+
+Retrieve a list of all uploaded documents.
+
+**Endpoint:** `GET /api/documents/`
+
+**Request:**
+```http
+GET /api/documents/ HTTP/1.1
+```
+
+**Response (Success):**
+```json
+[
+  {
+    "id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+    "file_name": "diabetes_management.pdf",
+    "document_type_id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+    "document_type_name": "Policy",
+    "uploaded_at": "2024-05-10T14:30:45Z",
+    "document_extension_type": "pdf"
+  },
+  {
+    "id": "a1b2c3d4-e5f6-7890-abcd-1234567890ab",
+    "file_name": "hypertension_protocol.docx",
+    "document_type_id": "g47ac10b-58cc-4372-a567-0e02b2c3d482",
+    "document_type_name": "Protocol",
+    "uploaded_at": "2024-05-09T11:20:15Z",
+    "document_extension_type": "docx"
+  }
+]
+```
+
+**Response (Error):**
+```json
+{
+  "error": "Failed to retrieve documents: Database connection error"
+}
+```
+
+### Get Document
+
+Retrieve metadata for a specific document by ID.
+
+**Endpoint:** `GET /api/documents/{document_id}/`
+
+**Request:**
+```http
+GET /api/documents/f47ac10b-58cc-4372-a567-0e02b2c3d479/ HTTP/1.1
+```
+
+**Response (Success):**
+```json
+{
+  "id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+  "file_name": "diabetes_management.pdf",
+  "document_type_id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+  "document_type_name": "Policy",
+  "uploaded_at": "2024-05-10T14:30:45Z",
+  "document_extension_type": "pdf"
+}
+```
+
+**Response (Error):**
+```json
+{
+  "error": "Document with ID f47ac10b-58cc-4372-a567-0e02b2c3d479 not found."
+}
+```
+
+### Download Document
+
+Download a document file by ID.
+
+**Endpoint:** `GET /api/documents/{document_id}/download/`
+
+**Request:**
+```http
+GET /api/documents/f47ac10b-58cc-4372-a567-0e02b2c3d479/download/ HTTP/1.1
+```
+
+**Response (Success):**
+```
+Binary file content with appropriate Content-Type and Content-Disposition headers
+```
+
+**Response (Error):**
+```json
+{
+  "error": "Document with ID f47ac10b-58cc-4372-a567-0e02b2c3d479 not found."
+}
+```
+
+### Delete Document
+
+Delete a document by ID, including its file in storage and related chunks.
+
+**Endpoint:** `DELETE /api/documents/{document_id}/`
+
+**Request:**
+```http
+DELETE /api/documents/f47ac10b-58cc-4372-a567-0e02b2c3d479/ HTTP/1.1
+```
+
+**Response (Success):**
+```
+204 No Content
+```
+
+**Response (Error):**
+```json
+{
+  "error": "Document with ID f47ac10b-58cc-4372-a567-0e02b2c3d479 not found."
 }
 ```
 
@@ -406,5 +524,8 @@ Compare two standard contents and analyze their differences using LLM.
   "error": "Missing required parameters. Please provide content1, content2, and standard_type_id."
 }
 ```
+
+
+
 
 
