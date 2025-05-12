@@ -9,6 +9,8 @@ from langchain.chains import LLMChain
 from dotenv import load_dotenv
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer, pipeline
+from .openrouter_client import get_openrouter_llm
+from .openrouter_config import OPENROUTER_MODELS
 
 # Load environment variables
 load_dotenv()
@@ -16,8 +18,9 @@ load_dotenv()
 logger = logging.getLogger(__name__)
 
 # --- LLM Configuration Settings ---
-# Environment variable to control API vs local model usage
-USE_HUGGINGFACE_API = os.getenv("USE_HUGGINGFACE_API", "true").lower() == "true"
+# Environment variable to control API provider
+USE_OPENROUTER = os.getenv("USE_OPENROUTER", "true").lower() == "true"
+USE_HUGGINGFACE_API = os.getenv("USE_HUGGINGFACE_API", "true").lower() == "true" and not USE_OPENROUTER
 
 # Local model paths and settings
 LOCAL_MODELS_DIR = os.getenv("LOCAL_MODELS_DIR", os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "models"))
@@ -27,7 +30,7 @@ LOCAL_TORCH_DTYPE = os.getenv("LOCAL_MODEL_DTYPE", "auto")  # Options: auto, flo
 
 # --- Model Configuration ---
 # Define available models with both API and local configurations
-AVAILABLE_MODELS = {
+HUGGINGFACE_MODELS = {
     "llama3-8b-instruct": {
         "api": {
             "type": "hf_endpoint",
@@ -73,6 +76,22 @@ AVAILABLE_MODELS = {
         }
     },
 }
+
+# Combine all available models
+AVAILABLE_MODELS = {}
+# Add HuggingFace models
+for model_name, config in HUGGINGFACE_MODELS.items():
+    AVAILABLE_MODELS[model_name] = {
+        "provider": "huggingface",
+        "config": config
+    }
+
+# Add OpenRouter models
+for model_name, config in OPENROUTER_MODELS.items():
+    AVAILABLE_MODELS[model_name] = {
+        "provider": "openrouter",
+        "config": config
+    }
 
 # --- Prompt Templates ---
 # Note: Adjust template based on the specific model's expected input format (e.g., Llama3 uses specific roles)
@@ -154,41 +173,56 @@ def get_llm_instance(model_name: str):
     """
     Gets an instance of the specified LLM with fallback mechanism.
     
-    First tries HuggingFace API if USE_HUGGINGFACE_API is True,
-    then falls back to local model if available and API fails.
+    First tries OpenRouter if USE_OPENROUTER is True,
+    then tries HuggingFace API if USE_HUGGINGFACE_API is True,
+    then falls back to local model if available.
     """
     if model_name not in AVAILABLE_MODELS:
         raise ValueError(f"Model '{model_name}' is not configured.")
     
-    model_config = AVAILABLE_MODELS[model_name]
+    model_info = AVAILABLE_MODELS[model_name]
+    provider = model_info["provider"]
     
-    # Try HuggingFace API first if enabled
-    if USE_HUGGINGFACE_API and "api" in model_config:
+    # Try OpenRouter first if enabled
+    if USE_OPENROUTER and provider == "openrouter":
         try:
-            llm = _get_hf_endpoint_instance(model_name, model_config["api"])
+            llm = get_openrouter_llm(model_name, temperature=0.7, max_tokens=1024)
             # Test the model with a simple prompt to verify it works
             _ = llm.invoke("Test connection")
-            logger.info(f"Successfully initialized HuggingFace API for {model_name}")
+            logger.info(f"Successfully initialized OpenRouter for {model_name}")
             return llm
         except Exception as e:
-            logger.warning(f"Failed to initialize or connect to HuggingFace API for {model_name}: {e}")
-            # Fall through to local model if available
+            logger.warning(f"Failed to initialize or connect to OpenRouter for {model_name}: {e}")
+            # Fall through to other options if available
     
-    # Try local model if available
-    if "local" in model_config:
-        try:
-            llm = _get_local_model_instance(model_name, model_config["local"])
-            logger.info(f"Successfully initialized local model for {model_name}")
-            return llm
-        except Exception as e:
-            logger.error(f"Failed to initialize local model for {model_name}: {e}")
-            raise RuntimeError(f"Could not load model {model_name} (API or local): {e}") from e
+    # If it's a HuggingFace model, try API or local
+    if provider == "huggingface":
+        model_config = model_info["config"]
+        
+        # Try HuggingFace API if enabled
+        if USE_HUGGINGFACE_API and "api" in model_config:
+            try:
+                llm = _get_hf_endpoint_instance(model_name, model_config["api"])
+                # Test the model with a simple prompt to verify it works
+                _ = llm.invoke("Test connection")
+                logger.info(f"Successfully initialized HuggingFace API for {model_name}")
+                return llm
+            except Exception as e:
+                logger.warning(f"Failed to initialize or connect to HuggingFace API for {model_name}: {e}")
+                # Fall through to local model if available
+        
+        # Try local model if available
+        if "local" in model_config:
+            try:
+                llm = _get_local_model_instance(model_name, model_config["local"])
+                logger.info(f"Successfully initialized local model for {model_name}")
+                return llm
+            except Exception as e:
+                logger.error(f"Failed to initialize local model for {model_name}: {e}")
+                raise RuntimeError(f"Could not load model {model_name} (API or local): {e}") from e
     
-    # If we get here, API failed and no local fallback is available
-    if USE_HUGGINGFACE_API:
-        raise RuntimeError(f"HuggingFace API failed for {model_name} and no local fallback is available")
-    else:
-        raise ValueError(f"Local model for {model_name} is not configured")
+    # If we get here, all options failed
+    raise RuntimeError(f"Could not initialize any provider for model {model_name}")
 
 def _get_hf_endpoint_instance(model_name: str, config: dict):
     """Helper function to initialize a HuggingFace endpoint instance."""
