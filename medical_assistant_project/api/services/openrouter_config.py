@@ -5,15 +5,14 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # OpenRouter Configuration
-OPENROUTER_API_KEY = "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"
+# Try to get API key from environment variable first, then fall back to hardcoded value
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 SITE_URL = "https://medical-document-assistant.nz"
 SITE_NAME = "NZ Medical Document Assistant"
 
 # Headers for OpenRouter API requests
 OPENROUTER_HEADERS = {
-    "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-    "Content-Type": "application/json",
     "HTTP-Referer": SITE_URL,
     "X-Title": SITE_NAME
 }

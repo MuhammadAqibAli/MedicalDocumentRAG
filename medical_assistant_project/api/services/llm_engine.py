@@ -80,11 +80,11 @@ HUGGINGFACE_MODELS = {
 # Combine all available models
 AVAILABLE_MODELS = {}
 # Add HuggingFace models
-for model_name, config in HUGGINGFACE_MODELS.items():
-    AVAILABLE_MODELS[model_name] = {
-        "provider": "huggingface",
-        "config": config
-    }
+# for model_name, config in HUGGINGFACE_MODELS.items():
+#     AVAILABLE_MODELS[model_name] = {
+#         "provider": "huggingface",
+#         "config": config
+#     }
 
 # Add OpenRouter models
 for model_name, config in OPENROUTER_MODELS.items():
@@ -127,11 +127,13 @@ CONTENT TO EVALUATE:
 --- END CONTENT ---
 
 Is this content appropriate and relevant for a {standard_type} document in a healthcare setting?
-Respond with a JSON object with the following structure:
-{
+Respond with ONLY a JSON object with the following structure:
+{{
     "is_valid": true/false,
     "reason": "Brief explanation of why it is or isn't valid"
-}
+}}
+
+Do not include any text before or after the JSON object. Only return the JSON.
 """
 
 CONTENT_COMPARISON_TEMPLATE = """
@@ -148,14 +150,14 @@ DOCUMENT 2:
 {content2}
 --- END DOCUMENT 2 ---
 
-Please analyze and respond with a JSON object with the following structure:
-{
+Please analyze and respond with ONLY a JSON object with the following structure:
+{{
     "key_differences": [
-        {
+        {{
             "aspect": "Name of the differing aspect",
             "document1": "How document 1 addresses this aspect",
             "document2": "How document 2 addresses this aspect"
-        }
+        }}
         // Add more differences as needed
     ],
     "recommendation": "Which document is better overall and why",
@@ -163,7 +165,9 @@ Please analyze and respond with a JSON object with the following structure:
         "Suggestion 1 for improving the documents",
         "Suggestion 2 for improving the documents"
     ]
-}
+}}
+
+Do not include any text before or after the JSON object. Only return the JSON.
 """
 
 # Cache for loaded models to avoid reloading
@@ -186,9 +190,10 @@ def get_llm_instance(model_name: str):
     # Try OpenRouter first if enabled
     if USE_OPENROUTER and provider == "openrouter":
         try:
-            llm = get_openrouter_llm(model_name, temperature=0.7, max_tokens=1024)
+            logger.info(f"Initializing OpenRouter for {model_name}")
+            llm = get_openrouter_llm(model_name=model_name, temperature=0.7, max_tokens=1024)
             # Test the model with a simple prompt to verify it works
-            _ = llm.invoke("Test connection")
+            ##test_response = llm.invoke("Test connection")
             logger.info(f"Successfully initialized OpenRouter for {model_name}")
             return llm
         except Exception as e:
@@ -310,39 +315,33 @@ def generate_content_with_llm(topic: str, content_type: str, model_name: str, co
     """
     llm = get_llm_instance(model_name)
 
+    # Prepare the prompt based on whether we have context or not
     if context:
-        prompt_template = PromptTemplate(
-            template=RAG_PROMPT_TEMPLATE,
-            input_variables=["content_type", "topic", "context"]
+        # Format the RAG prompt manually instead of using PromptTemplate
+        prompt = RAG_PROMPT_TEMPLATE.format(
+            content_type=content_type,
+            topic=topic,
+            context=context
         )
-        chain = LLMChain(llm=llm, prompt=prompt_template)
-        input_data = {"content_type": content_type, "topic": topic, "context": context}
     else:
-        prompt_template = PromptTemplate(
-            template=FALLBACK_PROMPT_TEMPLATE,
-            input_variables=["content_type", "topic"]
+        # Format the fallback prompt manually
+        prompt = FALLBACK_PROMPT_TEMPLATE.format(
+            content_type=content_type,
+            topic=topic
         )
-        chain = LLMChain(llm=llm, prompt=prompt_template)
-        input_data = {"content_type": content_type, "topic": topic}
 
     logger.info(f"Generating content for '{topic}' ({content_type}) using {model_name}. RAG context: {'Yes' if context else 'No'}")
 
     try:
-        # Some models return result in a dict, others directly. Adapt as needed.
-        # Check Langchain docs for the specific LLM wrapper you use.
-        response = chain.invoke(input_data)
-
-        # Extract the actual text - this key ('text' for LLMChain) might vary!
-        if isinstance(response, dict) and 'text' in response:
-             generated_text = response['text'].strip()
-        elif isinstance(response, str):
-             generated_text = response.strip()
-        else:
-            logger.error(f"Unexpected LLM response format: {type(response)} - {response}")
+        # Direct invocation without LangChain
+        generated_text = llm.invoke(prompt)
+        
+        if not generated_text or not isinstance(generated_text, str):
+            logger.error(f"Unexpected LLM response format: {type(generated_text)} - {generated_text}")
             raise TypeError("Could not parse LLM response.")
 
         logger.info(f"Successfully generated content for '{topic}' using {model_name}.")
-        return generated_text
+        return generated_text.strip()
 
     except Exception as e:
         logger.error(f"LLM generation failed for '{topic}' using {model_name}: {e}")
@@ -363,12 +362,8 @@ def validate_content_against_type(content: str, standard_type: str, model_name: 
     """
     llm = get_llm_instance(model_name)
     
-    prompt_template = PromptTemplate(
-        template=CONTENT_VALIDATION_TEMPLATE,
-        input_variables=["standard_type", "content"]
-    )
-    
-    formatted_prompt = prompt_template.format(
+    # Format the prompt manually
+    formatted_prompt = CONTENT_VALIDATION_TEMPLATE.format(
         standard_type=standard_type,
         content=content
     )
@@ -376,17 +371,33 @@ def validate_content_against_type(content: str, standard_type: str, model_name: 
     try:
         validation_response = llm.invoke(formatted_prompt)
         
-        # Parse JSON response
+        # Clean up the response to ensure it's valid JSON
+        validation_response = validation_response.strip()
+        
+        # Try to find JSON in the response using regex
         json_match = re.search(r'({.*})', validation_response, re.DOTALL)
         if json_match:
-            validation_result = json.loads(json_match.group(1))
-            return validation_result
+            json_str = json_match.group(1)
+            try:
+                validation_result = json.loads(json_str)
+                return validation_result
+            except json.JSONDecodeError as e:
+                logger.error(f"JSON decode error: {e}, JSON string: {json_str}")
+                return {
+                    "is_valid": False,
+                    "reason": f"Could not parse validation response: JSON decode error"
+                }
         else:
-            logger.error(f"Could not parse validation response: {validation_response}")
-            return {
-                "is_valid": False,
-                "reason": "Could not parse validation response"
-            }
+            # If regex fails, try to parse the entire response as JSON
+            try:
+                validation_result = json.loads(validation_response)
+                return validation_result
+            except json.JSONDecodeError:
+                logger.error(f"Could not parse validation response: {validation_response}")
+                return {
+                    "is_valid": False,
+                    "reason": "Could not parse validation response"
+                }
             
     except Exception as e:
         logger.error(f"Error validating content: {e}")
@@ -395,11 +406,11 @@ def validate_content_against_type(content: str, standard_type: str, model_name: 
 
 def compare_standard_contents(content1: str, content2: str, standard_type: str, model_name: str):
     """
-    Compares two standard contents and identifies key differences.
+    Compares two content pieces of the same standard type.
     
     Args:
-        content1: First standard content
-        content2: Second standard content
+        content1: First content to compare
+        content2: Second content to compare
         standard_type: The type of standard (e.g., "Policy", "Clinical Procedure")
         model_name: The LLM model to use for comparison
         
@@ -414,7 +425,7 @@ def compare_standard_contents(content1: str, content2: str, standard_type: str, 
             "message": f"First content is not valid for {standard_type}",
             "details": validation1.get("reason", "No reason provided")
         }
-        
+    
     validation2 = validate_content_against_type(content2, standard_type, model_name)
     if not validation2.get("is_valid", False):
         return {
@@ -426,12 +437,8 @@ def compare_standard_contents(content1: str, content2: str, standard_type: str, 
     # If both are valid, compare them
     llm = get_llm_instance(model_name)
     
-    prompt_template = PromptTemplate(
-        template=CONTENT_COMPARISON_TEMPLATE,
-        input_variables=["standard_type", "content1", "content2"]
-    )
-    
-    formatted_prompt = prompt_template.format(
+    # Format the prompt manually
+    formatted_prompt = CONTENT_COMPARISON_TEMPLATE.format(
         standard_type=standard_type,
         content1=content1,
         content2=content2
@@ -440,17 +447,33 @@ def compare_standard_contents(content1: str, content2: str, standard_type: str, 
     try:
         comparison_response = llm.invoke(formatted_prompt)
         
-        # Parse JSON response
+        # Clean up the response to ensure it's valid JSON
+        comparison_response = comparison_response.strip()
+        
+        # Try to find JSON in the response using regex
         json_match = re.search(r'({.*})', comparison_response, re.DOTALL)
         if json_match:
-            comparison_result = json.loads(json_match.group(1))
-            return {
-                "valid": True,
-                "comparison": comparison_result
-            }
+            json_str = json_match.group(1)
+            try:
+                comparison_result = json.loads(json_str)
+                return {
+                    "valid": True,
+                    "comparison": comparison_result
+                }
+            except json.JSONDecodeError as e:
+                logger.error(f"JSON decode error: {e}, JSON string: {json_str}")
+                raise ValueError(f"Failed to parse comparison results: JSON decode error")
         else:
-            logger.error(f"Could not parse comparison response: {comparison_response}")
-            raise ValueError("Failed to parse comparison results")
+            # If regex fails, try to parse the entire response as JSON
+            try:
+                comparison_result = json.loads(comparison_response)
+                return {
+                    "valid": True,
+                    "comparison": comparison_result
+                }
+            except json.JSONDecodeError:
+                logger.error(f"Could not parse comparison response: {comparison_response}")
+                raise ValueError("Failed to parse comparison results")
             
     except Exception as e:
         logger.error(f"Error comparing contents: {e}")

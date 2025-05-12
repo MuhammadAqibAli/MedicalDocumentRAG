@@ -4,7 +4,7 @@ from langchain.prompts import PromptTemplate
 logger = logging.getLogger(__name__)
 
 # Use a smaller/faster model for validation if possible, or reuse a main one
-VALIDATION_MODEL_NAME = "phi-3-mini-instruct" # Example: Use Phi-3 for validation
+VALIDATION_MODEL_NAME = "gpt-4o" # Example: Use Phi-3 for validation
 
 VALIDATION_PROMPT_TEMPLATE = """
 You are an expert reviewer for New Zealand healthcare documents. Evaluate the following generated text based on the criteria below. Respond ONLY with a JSON object containing your assessment. Do not add any introductory text or explanation outside the JSON.
