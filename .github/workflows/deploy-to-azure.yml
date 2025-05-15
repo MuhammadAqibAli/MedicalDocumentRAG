@@ -41,6 +41,7 @@ jobs:
           pip install -r ./medical_assistant_project/requirements.txt
 
       - name: Run Unit Tests
+        working-directory: ./medical_assistant_project
         run: |
           source ../venv/bin/activate
           echo "Running tests..."  # Replace with: python manage.py test or pytest
@@ -48,10 +49,10 @@ jobs:
 
       - name: Collect Static Files (Django)
         if: success()
+        working-directory: ./medical_assistant_project
         run: |
           source ../venv/bin/activate
-          python manage.py collectstatic --noinput
-        working-directory: ./medical_assistant_project
+          python manage.py collectstatic --noinput        
 
       - name: Login to Azure
         if: success()
