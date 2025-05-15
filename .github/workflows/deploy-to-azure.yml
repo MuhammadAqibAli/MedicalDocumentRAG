@@ -57,7 +57,7 @@ jobs:
         if: success() # Only run if previous steps pass
         uses: azure/webapps-deploy@v2
         with:
-          app-name: 'your-azure-app-service-name' # Replace with your App Service name
+          app-name: mmc # Replace with your App Service name
           # slot-name: 'production' # Optional: if you use deployment slots
           package: '.' # Deploy the entire current directory (content of main branch)
           # startup-command: 'gunicorn --bind=0.0.0.0 --timeout 600 medical_assistant_project.wsgi' # Optional if set in Azure Portal
