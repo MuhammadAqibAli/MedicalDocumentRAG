@@ -3,67 +3,55 @@ name: Deploy Python App to Azure App Service
 on:
   push:
     branches:
-      - main # Trigger deployment on every push to main
+      - main
 
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
-    # No 'environment' needed here unless you want to use environment-specific secrets/variables
-    # not related to manual approval.
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-        # No need to specify ref, default is the triggering branch (main)
 
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: '3.11' # Specify your Python version
+          python-version: '3.11'
 
-      - name: Install dependencies
+      - name: Install Python Dependencies
         run: |
           python -m venv venv
           source venv/bin/activate
           python -m pip install --upgrade pip
           pip install -r ./medical_assistant_project/requirements.txt
-          name: 'Install Python Dependencies'
 
-      # Optional: Run Tests (Highly Recommended even without approvals)
-      - name: Run Tests
+      - name: Run Unit Tests
         run: |
           source venv/bin/activate
-          # Replace with your actual test command, e.g., python manage.py test
-          echo "Running tests..." # Placeholder
-          name: 'Run Unit Tests'
-        # You might want to make the deployment conditional on tests passing:
-        # if: success() # This is implicit if the test step is before deploy
+          echo "Running tests..." # Replace with actual test command
 
-      # Optional: Django Collect Static (if not handled by startup or build on Azure)
       - name: Collect Static Files (Django)
-        if: success() # Only run if tests pass (if you have tests)
+        if: success()
         run: |
           source venv/bin/activate
           python manage.py collectstatic --noinput
-          name: 'Collect Static Files'
+        working-directory: ./medical_assistant_project
 
       - name: Login to Azure
-        if: success() # Only run if previous steps pass
+        if: success()
         uses: azure/login@v1
         with:
-          creds: ${{ secrets.AZURE_CREDENTIALS }} # Store Azure Service Principal credentials as a GitHub secret
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
 
       - name: Deploy to Azure Web App
-        if: success() # Only run if previous steps pass
+        if: success()
         uses: azure/webapps-deploy@v2
         with:
-          app-name: mmc # Replace with your App Service name
-          # slot-name: 'production' # Optional: if you use deployment slots
-          package: '.' # Deploy the entire current directory (content of main branch)
-          # startup-command: 'gunicorn --bind=0.0.0.0 --timeout 600 medical_assistant_project.wsgi' # Optional if set in Azure Portal
+          app-name: mmc
+          package: './medical_assistant_project'
 
       - name: Logout from Azure
+        if: always()
         run: |
           az logout
           az account clear
-        if: always() # Ensure logout happens even if previous steps fail
