@@ -1,4 +1,15 @@
 #!/bin/bash
-# Gunicorn command to start the Django application
-# Make sure medical_assistant_project.wsgi is the correct path to your WSGI application
-gunicorn --bind=0.0.0.0 --timeout 600 medical_assistant_project.wsgi
+
+# Navigate to the folder
+cd /home/site/wwwroot
+
+# Create a virtual environment (optional but good)
+python -m venv venv
+source venv/bin/activate
+
+# Install dependencies
+pip install --upgrade pip
+pip install -r requirements.txt
+
+# Start Gunicorn for Django
+gunicorn medical_assistant_project.wsgi --bind=0.0.0.0 --timeout 600
