@@ -17,6 +17,12 @@ jobs:
       SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
       SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
       HUGGINGFACEHUB_API_TOKEN: ${{ secrets.HUGGINGFACEHUB_API_TOKEN }}
+      USE_HUGGINGFACE_API: ${{ secrets.USE_HUGGINGFACE_API }}
+      LOCAL_MODELS_DIR: ${{ secrets.LOCAL_MODELS_DIR }}
+      LOCAL_MODEL_DEVICE: ${{ secrets.LOCAL_MODEL_DEVICE }}
+      LOCAL_MODEL_DTYPE: ${{ secrets.LOCAL_MODEL_DTYPE }}
+      OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+      USE_OPENROUTER_EMBEDDINGS: ${{ secrets.USE_OPENROUTER_EMBEDDINGS }}
 
     steps:
       - name: Checkout code
