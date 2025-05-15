@@ -25,13 +25,12 @@ jobs:
 
       - name: Run Unit Tests
         run: |
-          source venv/bin/activate
-          echo "Running tests..." # Replace with actual test command
+          echo "Running tests..."  # Replace with: python manage.py test or pytest
+          # Example: python ./medical_assistant_project/manage.py test
 
       - name: Collect Static Files (Django)
         if: success()
         run: |
-          source venv/bin/activate
           python manage.py collectstatic --noinput
         working-directory: ./medical_assistant_project
 
@@ -45,7 +44,7 @@ jobs:
         if: success()
         uses: azure/webapps-deploy@v2
         with:
-          app-name: mmc
+          app-name: mmc  # Replace with your actual Azure App Service name
           package: './medical_assistant_project'
 
       - name: Logout from Azure
