@@ -27,7 +27,7 @@ jobs:
           source venv/bin/activate
           python -m pip install --upgrade pip
           pip install -r ./medical_assistant_project/requirements.txt
-          displayName: 'Install Python Dependencies'
+          name: 'Install Python Dependencies'
 
       # Optional: Run Tests (Highly Recommended even without approvals)
       - name: Run Tests
@@ -35,7 +35,7 @@ jobs:
           source venv/bin/activate
           # Replace with your actual test command, e.g., python manage.py test
           echo "Running tests..." # Placeholder
-          displayName: 'Run Unit Tests'
+          name: 'Run Unit Tests'
         # You might want to make the deployment conditional on tests passing:
         # if: success() # This is implicit if the test step is before deploy
 
@@ -45,7 +45,7 @@ jobs:
         run: |
           source venv/bin/activate
           python manage.py collectstatic --noinput
-          displayName: 'Collect Static Files'
+          name: 'Collect Static Files'
 
       - name: Login to Azure
         if: success() # Only run if previous steps pass
