@@ -7,6 +7,7 @@ ENV PYTHONUNBUFFERED 1
 # --- Build-time Arguments for settings needed by collectstatic ---
 ARG DJANGO_SECRET_KEY_BUILD="dummy-build-time-secret-key-for-collectstatic"
 ARG DJANGO_DEBUG_BUILD="False"
+ARG DJANGO_DATABASE_URL_BUILD="sqlite:///:memory:"
 # Add other ARGs here if collectstatic specifically needs them (e.g., STATIC_ROOT if configured via ENV)
 # ARG DJANGO_STATIC_ROOT_BUILD="/app/staticfiles"
 
