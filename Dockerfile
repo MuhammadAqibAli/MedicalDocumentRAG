@@ -20,7 +20,7 @@ RUN pip install gunicorn  # Explicitly install gunicorn
 COPY . /app/
 
 # Copy .env file
-COPY .env /app/.env
+COPY ./medical_assistant_project/.env /app/.env
 
 # Collect static files
 WORKDIR /app/medical_assistant_project
