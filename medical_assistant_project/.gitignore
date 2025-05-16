@@ -208,3 +208,13 @@ _site/
 *.docx
 *.xlsx
 *.pptx
+
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+env/
+venv/
+*.db
+*.sqlite3
+.git
