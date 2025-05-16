@@ -38,6 +38,7 @@ jobs:
           build-args: |
             DJANGO_SECRET_KEY_BUILD=${{ secrets.DJANGO_BUILD_TIME_SECRET_KEY }}
             DJANGO_DEBUG_BUILD=False
+            DJANGO_DATABASE_URL_BUILD=sqlite:///:memory:
             # If you added more ARGs in Dockerfile for collectstatic, pass them here:
             # DJANGO_STATIC_ROOT_BUILD=/app/staticfiles
         # Note: DJANGO_BUILD_TIME_SECRET_KEY should be a GitHub secret with a dummy value.
