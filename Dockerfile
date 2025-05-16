@@ -36,7 +36,7 @@ COPY . /app/
 
 # Collect static files
 # This will use the SECRET_KEY and DEBUG values set from the ARGs above
-WORKDIR /app/medical_assistant_project # Ensure this is where manage.py is located
+WORKDIR /app/medical_assistant_project
 RUN python manage.py collectstatic --noinput
 
 # --- Unset build-time specific ENVs if you want to be super clean, though runtime ENVs will override ---
