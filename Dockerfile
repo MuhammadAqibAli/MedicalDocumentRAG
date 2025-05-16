@@ -19,9 +19,6 @@ RUN pip install gunicorn  # Explicitly install gunicorn
 # Copy project
 COPY . /app/
 
-# Copy .env file
-COPY ./medical_assistant_project/.env /app/.env
-
 # Collect static files
 WORKDIR /app/medical_assistant_project
 RUN python manage.py collectstatic --noinput
