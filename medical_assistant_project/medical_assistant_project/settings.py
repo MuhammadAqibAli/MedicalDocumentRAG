@@ -232,28 +232,37 @@ REST_FRAMEWORK = {
 
 # --- Logging Configuration (Optional but Recommended) ---
 # Basic example, can be customized further
+# settings.py
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
+    'formatters': { # Optional: Add a more detailed formatter
+        'verbose': {
+            'format': '{levelname} {asctime} {module} {process:d} {thread:d} {message}',
+            'style': '{',
+        },
+    },
     'handlers': {
         'console': {
             'class': 'logging.StreamHandler',
+            'formatter': 'verbose', # Use the verbose formatter
         },
     },
     'root': {
         'handlers': ['console'],
-        'level': 'INFO', # Set to DEBUG for more verbose output during development
+        'level': 'DEBUG', # More verbose
     },
     'loggers': {
         'django': {
             'handlers': ['console'],
-            'level': os.getenv('DJANGO_LOG_LEVEL', 'INFO'),
-            'propagate': False,
+            'level': 'DEBUG', # More verbose
+            'propagate': True, # Allow django logs to also go to root
         },
-        'api': { # Your app's logger
+        'api': {
             'handlers': ['console'],
-            'level': 'DEBUG' if DEBUG else 'INFO', # More logs from your app in dev
-            'propagate': False,
+            'level': 'DEBUG',
+            'propagate': True,
         },
+        # Add other specific loggers if needed
     },
 }
