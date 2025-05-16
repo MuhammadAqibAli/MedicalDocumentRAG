@@ -38,9 +38,17 @@ DEBUG = os.getenv('DEBUG', 'False').lower() in ('true', '1', 't')
 
 # Define allowed hosts. Start with development hosts.
 # For production, replace with your actual domain(s) or load from env var.
-ALLOWED_HOSTS = ['*']
+ALLOWED_HOSTS = [
+    'mmc-backend-gdgvg2hpf3c2dagx.uaenorth-01.azurewebsites.net',
+    'localhost',
+    '127.0.0.1',
+]
 if DEBUG:
-    ALLOWED_HOSTS = ['localhost', '127.0.0.1']
+    ALLOWED_HOSTS = [
+    'mmc-backend-gdgvg2hpf3c2dagx.uaenorth-01.azurewebsites.net',
+    'localhost',
+    '127.0.0.1',
+]
 # Example for production using environment variable:
 # ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', '').split(',') if os.getenv('ALLOWED_HOSTS') else []
 
