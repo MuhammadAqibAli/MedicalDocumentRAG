@@ -47,4 +47,4 @@ RUN python manage.py collectstatic --noinput
 
 # The CMD will use RUNTIME environment variables provided by Azure App Service
 # EXPOSE 8000 # Good practice if you are also running locally
-CMD ["python", "-m", "gunicorn", "medical_assistant_project.wsgi:application", "--bind", "0.0.0.0:8000", "--workers=1", "--log-level=debug", "--access-logfile=-", "--error-logfile=-", "--timeout=240"]
+CMD ["python", "-m", "gunicorn", "medical_assistant_project.wsgi:application", "--bind", "0.0.0.0:80", "--workers=1", "--log-level=debug", "--access-logfile=-", "--error-logfile=-", "--timeout=240"]
