@@ -10,9 +10,9 @@ jobs:
     runs-on: ubuntu-latest
 
     env:
-      AZURE_WEBAPP_NAME: mmc-backend
-      ACR_LOGIN_SERVER: ${{ secrets.ACR_LOGIN_SERVER }}
-      IMAGE_NAME: medical-app
+      AZURE_WEBAPP_NAME: mmc-backend # Your Azure App Service for containers name
+      ACR_LOGIN_SERVER: ${{ secrets.ACR_LOGIN_SERVER }} # e.g., youracrname.azurecr.io
+      IMAGE_NAME: medical-app # Your image name
 
     steps:
       - name: Checkout Code
@@ -24,24 +24,33 @@ jobs:
       - name: Log in to Azure Container Registry (ACR)
         uses: docker/login-action@v3
         with:
-          registry: ${{ secrets.ACR_LOGIN_SERVER }}
+          registry: ${{ env.ACR_LOGIN_SERVER }} # Use env var for consistency
           username: ${{ secrets.ACR_USERNAME }}
           password: ${{ secrets.ACR_PASSWORD }}
 
       - name: Build and Push Docker Image to ACR
         uses: docker/build-push-action@v5
         with:
-          context: .
+          context: . # Assumes Dockerfile is at the root of the repository
+          # file: ./Dockerfile # Specify if Dockerfile is not at context root
           push: true
-          tags: ${{ secrets.ACR_LOGIN_SERVER }}/${{ env.IMAGE_NAME }}:latest
+          tags: ${{ env.ACR_LOGIN_SERVER }}/${{ env.IMAGE_NAME }}:latest # Using env vars
+          build-args: |
+            DJANGO_SECRET_KEY_BUILD=${{ secrets.DJANGO_BUILD_TIME_SECRET_KEY }}
+            DJANGO_DEBUG_BUILD=False
+            # If you added more ARGs in Dockerfile for collectstatic, pass them here:
+            # DJANGO_STATIC_ROOT_BUILD=/app/staticfiles
+        # Note: DJANGO_BUILD_TIME_SECRET_KEY should be a GitHub secret with a dummy value.
+        # It does NOT need to be your production SECRET_KEY.
 
       - name: Azure Login
         uses: azure/login@v1
         with:
-          creds: ${{ secrets.AZURE_CREDENTIALS }}
+          creds: ${{ secrets.AZURE_CREDENTIALS }} # Your Azure Service Principal credentials
 
-      - name: Deploy to Azure Web App
+      - name: Deploy to Azure Web App for Containers
         uses: azure/webapps-deploy@v2
         with:
           app-name: ${{ env.AZURE_WEBAPP_NAME }}
-          images: ${{ secrets.ACR_LOGIN_SERVER }}/${{ env.IMAGE_NAME }}:latest
+          images: ${{ env.ACR_LOGIN_SERVER }}/${{ env.IMAGE_NAME }}:latest # Using env vars
+          # Azure App Service Application Settings will provide the RUNTIME environment variables
