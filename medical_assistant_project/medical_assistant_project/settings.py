@@ -12,7 +12,7 @@ https://docs.djangoproject.com/en/stable/ref/settings/
 
 import os
 from pathlib import Path
-# from dotenv import load_dotenv
+#from dotenv import load_dotenv
 import dj_database_url
 
 # --- Environment Variable Loading ---
@@ -21,8 +21,8 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 # Load environment variables from .env file in the project root
 # Make sure your .env file is in the same directory as manage.py
-# ENV_PATH = BASE_DIR / '.env'
-# load_dotenv(dotenv_path=ENV_PATH)
+#ENV_PATH = BASE_DIR / '.env'
+#load_dotenv(dotenv_path=ENV_PATH)
 
 # --- Core Security Settings ---
 
@@ -92,6 +92,7 @@ if DEBUG:
 else:
     CORS_ALLOWED_ORIGINS = [
         "http://localhost:3000",
+        "https://mmc-hwdxcbegc3cvg0dv.uaenorth-01.azurewebsites.net"
         # Add production domains here
     ]
 
