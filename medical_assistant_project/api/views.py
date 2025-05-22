@@ -3,19 +3,23 @@ from rest_framework.response import Response
 from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.exceptions import APIException
 from django_filters.rest_framework import DjangoFilterBackend # For filtering list views
-from .models import Document, GeneratedContent, Standard, StandardType
+from .models import Document, GeneratedContent, Standard, StandardType, QuestionOption, AuditQuestion
 from .serializers import (
     DocumentSerializer,
     GeneratedContentSerializer,
     ContentGenerationRequestSerializer,
     StandardTypeSerializer,
     StandardCreateUpdateSerializer,
-    StandardDetailSerializer
+    StandardDetailSerializer,
+    QuestionOptionSerializer,
+    AuditQuestionSerializer,
+    AuditQuestionGenerationRequestSerializer
 )
 from .services import document_processor, rag_retriever, llm_engine, validator
 from .services.validator import VALIDATION_MODEL_NAME
 import logging
-
+import re
+import json
 logger = logging.getLogger(__name__)
 
 class ServiceUnavailable(APIException):
@@ -144,7 +148,7 @@ class ContentGenerationView(views.APIView):
             # if 'error' in validation_results:
             #      logger.warning(f"Validation process encountered an issue: {validation_results['error']}")
             #      # Decide if you want to proceed without validation results or fail
-            
+
             # Use empty dict for validation_results since we're skipping validation
             validation_results = {}
 
@@ -180,7 +184,7 @@ class GeneratedContentViewSet(viewsets.ReadOnlyModelViewSet):
     Supports filtering by content_type, llm_model_used, and date range.
     Example query: /api/generated-content/?content_type=Policy&llm_model_used=llama3-8b-instruct&created_after=2024-01-01
     """
-    
+
     queryset = GeneratedContent.objects.all().order_by('-created_at')
     serializer_class = GeneratedContentSerializer
     filter_backends = [DjangoFilterBackend]
@@ -206,7 +210,7 @@ class AvailableModelsView(views.APIView):
         except Exception as e:
             logger.exception("Error retrieving available models")
             return Response(
-                {"error": "Failed to retrieve available models"}, 
+                {"error": "Failed to retrieve available models"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
@@ -221,7 +225,7 @@ class MedicalStandardView(views.APIView):
     """
     API endpoint for managing medical standards.
     """
-    
+
     def post(self, request, *args, **kwargs):
         """
         Save a new medical standard.
@@ -232,7 +236,7 @@ class MedicalStandardView(views.APIView):
             response_serializer = StandardDetailSerializer(standard)
             return Response(response_serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    
+
     def put(self, request, standard_id, *args, **kwargs):
         """
         Update an existing medical standard.
@@ -241,14 +245,14 @@ class MedicalStandardView(views.APIView):
             standard = Standard.objects.get(id=standard_id, is_deleted=False)
         except Standard.DoesNotExist:
             return Response({"error": "Standard not found"}, status=status.HTTP_404_NOT_FOUND)
-        
+
         serializer = StandardCreateUpdateSerializer(standard, data=request.data, partial=True)
         if serializer.is_valid():
             updated_standard = serializer.save()
             response_serializer = StandardDetailSerializer(updated_standard)
             return Response(response_serializer.data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    
+
     def delete(self, request, standard_id, *args, **kwargs):
         """
         Soft delete a medical standard.
@@ -257,11 +261,11 @@ class MedicalStandardView(views.APIView):
             standard = Standard.objects.get(id=standard_id, is_deleted=False)
         except Standard.DoesNotExist:
             return Response({"error": "Standard not found"}, status=status.HTTP_404_NOT_FOUND)
-        
+
         standard.is_deleted = True
         standard.save()
         return Response(status=status.HTTP_204_NO_CONTENT)
-    
+
     def get(self, request, standard_id=None, *args, **kwargs):
         """
         Get a specific medical standard or list standards filtered by standard_type_id.
@@ -279,23 +283,23 @@ class MedicalStandardView(views.APIView):
         else:
             # Get standard_type_id from query parameters
             standard_type_id = request.query_params.get('standard_type_id')
-            
+
             # Start with base queryset
             queryset = Standard.objects.select_related(
                 'standard_type', 'generated_content'
             ).filter(is_deleted=False)
-            
+
             # Filter by standard_type_id if provided
             if standard_type_id:
                 queryset = queryset.filter(standard_type_id=standard_type_id)
-                
+
             serializer = StandardDetailSerializer(queryset, many=True)
             return Response(serializer.data)
-    
+
     def compare_standards(self, request, *args, **kwargs):
         """
         Compare two standard contents and analyze their differences using LLM.
-        
+
         Expects:
         - content1: First standard content
         - content2: Second standard content
@@ -304,14 +308,14 @@ class MedicalStandardView(views.APIView):
         content1 = request.data.get('content1')
         content2 = request.data.get('content2')
         standard_type_id = request.data.get('standard_type_id')
-        
+
         # Validate inputs
         if not content1 or not content2 or not standard_type_id:
             return Response(
                 {"error": "Missing required parameters. Please provide content1, content2, and standard_type_id."},
                 status=status.HTTP_400_BAD_REQUEST
             )
-        
+
         try:
             # Get standard type name
             standard_type = StandardType.objects.get(id=standard_type_id, is_deleted=False)
@@ -321,7 +325,7 @@ class MedicalStandardView(views.APIView):
                 {"error": f"Standard type with ID {standard_type_id} not found."},
                 status=status.HTTP_404_NOT_FOUND
             )
-        
+
         try:
             # Use the validation model for comparison
             comparison_result = llm_engine.compare_standard_contents(
@@ -330,9 +334,9 @@ class MedicalStandardView(views.APIView):
                 standard_type=standard_type_name,
                 model_name=VALIDATION_MODEL_NAME
             )
-            
+
             return Response(comparison_result, status=status.HTTP_200_OK)
-                
+
         except ValueError as ve:
             logger.error(f"Validation error: {ve}")
             return Response(
@@ -356,30 +360,30 @@ class StandardSearchView(views.APIView):
     """
     API endpoint for searching medical standards.
     """
-    
+
     def get(self, request, *args, **kwargs):
         """
         Search standards by type or title.
         """
         standard_type_id = request.query_params.get('standard_type_id')
         standard_title = request.query_params.get('standard_title')
-        
+
         if not standard_type_id and not standard_title:
             return Response(
                 {"error": "Please provide at least one search parameter (standard_type_id or standard_title)"},
                 status=status.HTTP_400_BAD_REQUEST
             )
-        
+
         queryset = Standard.objects.select_related(
             'standard_type', 'generated_content'
         ).filter(is_deleted=False)
-        
+
         if standard_type_id:
             queryset = queryset.filter(standard_type_id=standard_type_id)
-        
+
         if standard_title:
             queryset = queryset.filter(standard_title__icontains=standard_title)
-        
+
         serializer = StandardDetailSerializer(queryset, many=True)
         return Response(serializer.data)
 
@@ -391,7 +395,7 @@ class MedicalStandardCompareView(views.APIView):
     def post(self, request):
         """
         Compare two standard contents and analyze their differences using LLM.
-        
+
         Expects:
         - content1: First standard content
         - content2: Second standard content
@@ -400,14 +404,14 @@ class MedicalStandardCompareView(views.APIView):
         content1 = request.data.get('content1')
         content2 = request.data.get('content2')
         standard_type_id = request.data.get('standard_type_id')
-        
+
         # Validate inputs
         if not content1 or not content2 or not standard_type_id:
             return Response(
                 {"error": "Missing required parameters. Please provide content1, content2, and standard_type_id."},
                 status=status.HTTP_400_BAD_REQUEST
             )
-        
+
         try:
             # Get standard type name
             standard_type = StandardType.objects.get(id=standard_type_id, is_deleted=False)
@@ -417,7 +421,7 @@ class MedicalStandardCompareView(views.APIView):
                 {"error": f"Standard type with ID {standard_type_id} not found."},
                 status=status.HTTP_404_NOT_FOUND
             )
-        
+
         try:
             # Use the validation model for comparison
             comparison_result = llm_engine.compare_standard_contents(
@@ -426,9 +430,9 @@ class MedicalStandardCompareView(views.APIView):
                 standard_type=standard_type_name,
                 model_name=VALIDATION_MODEL_NAME
             )
-            
+
             return Response(comparison_result, status=status.HTTP_200_OK)
-                
+
         except ValueError as ve:
             logger.error(f"Validation error: {ve}")
             return Response(
@@ -457,14 +461,195 @@ class DocumentDownloadView(views.APIView):
         Downloads a document file from Supabase storage.
         """
         file_content, file_name, content_type, error = document_processor.download_document(document_id)
-        
+
         if error:
             status_code = status.HTTP_404_NOT_FOUND if "not found" in error else status.HTTP_500_INTERNAL_SERVER_ERROR
             return Response({"error": error}, status=status_code)
-        
+
         # Create Django response with file content
         from django.http import HttpResponse
         response = HttpResponse(file_content, content_type=content_type)
         response['Content-Disposition'] = f'attachment; filename="{file_name}"'
-        
+
         return response
+
+class AuditQuestionGeneratorView(views.APIView):
+    """
+    API endpoint for generating audit questions based on a policy using OpenRouter API.
+    """
+    def post(self, request, *args, **kwargs):
+        """
+        Generate audit questions based on a policy using an AI model.
+
+        Expects:
+        - ai_model: The AI model to use from OpenRouter
+        - policy_name: The name of the policy to generate questions about
+        - number_of_questions: The total number of questions to generate
+        """
+        serializer = AuditQuestionGenerationRequestSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        validated_data = serializer.validated_data
+        ai_model = validated_data['ai_model']
+        policy_name = validated_data['policy_name']
+        number_of_questions = validated_data['number_of_questions']
+
+        try:
+            llm = llm_engine.get_llm_instance(ai_model)
+
+            prompt = f"""
+            Generate {number_of_questions} audit questions for the policy named "{policy_name}".
+
+            Each question should be designed to assess compliance with the policy.
+            Format the response as a JSON array of objects, where each object has the following structure:
+            {{
+                "question_text": "The text of the audit question",
+                "options": ["Compliant", "Partial Compliant", "Non Compliant"]
+            }}
+
+            Make sure the questions are specific, clear, and directly related to compliance with the policy.
+            IMPORTANT: The response should ONLY be the JSON array itself, without any surrounding text, explanations, or markdown formatting like ```json or ```.
+            """ # Added a more explicit instruction to the LLM
+
+            generated_text_raw = llm.invoke(prompt)
+
+            # --- SOLUTION: Extract JSON from Markdown code block ---
+            cleaned_json_text = generated_text_raw
+            # Regex to find JSON possibly wrapped in markdown code blocks
+            # It looks for ```json ... ``` or just ``` ... ```
+            # and extracts the content within.
+            # [\s\S] matches any character including newlines.
+            # *? makes it non-greedy.
+            match = re.search(r"```(?:json)?\s*([\s\S]*?)\s*```", generated_text_raw)
+            if match:
+                cleaned_json_text = match.group(1).strip() # Get the captured group and strip whitespace
+            else:
+                # If no markdown block is found, try a more general cleanup.
+                # This attempts to find the first '{' or '[' and the last '}' or ']'
+                # This is a heuristic and might need adjustment if the LLM output varies a lot.
+                start_json = -1
+                end_json = -1
+
+                first_brace = cleaned_json_text.find('{')
+                first_bracket = cleaned_json_text.find('[')
+
+                if first_brace != -1 and first_bracket != -1:
+                    start_json = min(first_brace, first_bracket)
+                elif first_brace != -1:
+                    start_json = first_brace
+                elif first_bracket != -1:
+                    start_json = first_bracket
+                
+                if start_json != -1:
+                    last_brace = cleaned_json_text.rfind('}')
+                    last_bracket = cleaned_json_text.rfind(']')
+                    
+                    if last_brace != -1 and last_bracket != -1:
+                        end_json = max(last_brace, last_bracket)
+                    elif last_brace != -1:
+                        end_json = last_brace
+                    elif last_bracket != -1:
+                        end_json = last_bracket
+                    
+                    if end_json != -1 and end_json >= start_json:
+                        cleaned_json_text = cleaned_json_text[start_json : end_json+1]
+                    else: # Fallback if sensible end not found
+                        cleaned_json_text = cleaned_json_text.strip() 
+                else: # Fallback if sensible start not found
+                    cleaned_json_text = cleaned_json_text.strip()
+            # --- END SOLUTION ---
+
+            try:
+                # Parse the cleaned text as JSON
+                questions_data = json.loads(cleaned_json_text)
+
+                if not isinstance(questions_data, list):
+                    # Log the problematic data for inspection
+                    logger.error(f"Generated content parsed but is not a list. Content: {cleaned_json_text[:500]}") # Log first 500 chars
+                    raise ValueError("Generated content is not a list of questions")
+
+                stored_questions = []
+                for question_data in questions_data:
+                    if not isinstance(question_data, dict) or 'question_text' not in question_data:
+                        logger.warning(f"Skipping malformed question object in list: {question_data}")
+                        continue
+
+                    question = AuditQuestion.objects.create(
+                        question_text=question_data['question_text'],
+                        policy_name=policy_name,
+                        ai_model=ai_model,
+                        options=question_data.get('options', ["Compliant", "Partial Compliant", "Non Compliant"])
+                    )
+                    stored_questions.append(question)
+
+                serializer_out = AuditQuestionSerializer(stored_questions, many=True) # Renamed to avoid conflict
+                return Response(serializer_out.data, status=status.HTTP_201_CREATED)
+
+            except json.JSONDecodeError as e:
+                # Log both raw and cleaned text for better debugging
+                logger.error(
+                    f"Failed to parse generated content as JSON: {e}. "
+                    f"Raw text (first 500 chars): '{generated_text_raw[:500]}...'. "
+                    f"Cleaned text (first 500 chars): '{cleaned_json_text[:500]}...'"
+                )
+                return Response(
+                    {"error": "Failed to parse generated content as JSON from AI model. The model might have returned an invalid format."},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                )
+            except ValueError as ve: # This will catch the "Generated content is not a list"
+                logger.warning(f"Validation error in generated JSON structure: {ve}. Cleaned JSON: {cleaned_json_text[:500]}")
+                return Response({"error": str(ve)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+        except ValueError as ve: # This is for serializer.validated_data or llm_engine.get_llm_instance
+            logger.warning(f"Audit question generation input error: {ve}")
+            return Response({"error": str(ve)}, status=status.HTTP_400_BAD_REQUEST)
+        # Make sure ServiceUnavailable is defined or imported if you use it
+        # For example, if it's from openai: from openai import APIError as ServiceUnavailable
+        # Or if it's a custom exception. For now, I'll make it more generic.
+        except (ConnectionError, RuntimeError) as se: # Removed ServiceUnavailable for now, ensure it's defined if used
+            logger.error(f"Audit question generation service error: {se}")
+            # status_code = se.status_code if hasattr(se, 'status_code') and isinstance(se, ServiceUnavailable) else status.HTTP_503_SERVICE_UNAVAILABLE
+            # Simplified for now:
+            return Response({"error": f"Generation service error: {str(se)}"}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+        except Exception as e:
+            logger.exception("Unexpected error during audit question generation.")
+            return Response(
+                {"error": f"An unexpected server error occurred during generation: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+class AuditQuestionUpdateView(views.APIView):
+    """
+    API endpoint for updating a specific audit question.
+    """
+    def put(self, request, question_id, *args, **kwargs):
+        """
+        Update a specific audit question by its ID.
+        """
+        try:
+            question = AuditQuestion.objects.get(id=question_id)
+        except AuditQuestion.DoesNotExist:
+            return Response({"error": "Audit question not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        serializer = AuditQuestionSerializer(question, data=request.data, partial=True)
+        if serializer.is_valid():
+            updated_question = serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+class AuditQuestionDeleteView(views.APIView):
+    """
+    API endpoint for deleting a specific audit question.
+    """
+    def delete(self, request, question_id, *args, **kwargs):
+        """
+        Delete a specific audit question by its ID.
+        """
+        try:
+            question = AuditQuestion.objects.get(id=question_id)
+        except AuditQuestion.DoesNotExist:
+            return Response({"error": "Audit question not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        question.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)

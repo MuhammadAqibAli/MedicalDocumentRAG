@@ -1,6 +1,7 @@
 from django.db import models
 from pgvector.django import VectorField
 import uuid
+import json
 
 class Document(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -54,10 +55,10 @@ class Standard(models.Model):
     content = models.TextField()
     version = models.CharField(max_length=50)
     generated_content = models.ForeignKey(
-        GeneratedContent, 
-        on_delete=models.SET_NULL, 
-        null=True, 
-        blank=True, 
+        GeneratedContent,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
         related_name='standards'
     )
     is_deleted = models.BooleanField(default=False)
@@ -66,3 +67,30 @@ class Standard(models.Model):
 
     def __str__(self):
         return f"{self.standard_title} (v{self.version})"
+
+class QuestionOption(models.Model):
+    """
+    Model for storing predefined question options.
+    """
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    label = models.CharField(max_length=100)
+    property = models.CharField(max_length=100)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return self.label
+
+class AuditQuestion(models.Model):
+    """
+    Model for storing audit questions generated based on policies.
+    """
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    question_text = models.TextField()
+    policy_name = models.CharField(max_length=255)
+    ai_model = models.CharField(max_length=200)
+    options = models.JSONField(null=True, blank=True)  # Store options as JSON
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"Audit question for {self.policy_name}"

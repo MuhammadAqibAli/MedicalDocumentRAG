@@ -12,45 +12,71 @@ https://docs.djangoproject.com/en/stable/ref/settings/
 
 import os
 from pathlib import Path
-#from dotenv import load_dotenv
+# Note: `load_dotenv` is imported conditionally later
 import dj_database_url
 
-# --- Environment Variable Loading ---
+# --- Base Directory ---
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# Load environment variables from .env file in the project root
-# Make sure your .env file is in the same directory as manage.py
-#ENV_PATH = BASE_DIR / '.env'
-#load_dotenv(dotenv_path=ENV_PATH)
+# --- Environment Type Detection ---
+# Set an environment variable like `APP_ENV=development` in your local environment.
+# In production (e.g., Azure), this variable would either not be set (defaulting to 'production')
+# or you can explicitly set it to `APP_ENV=production`.
+APP_ENV = os.getenv('APP_ENV', 'production').lower()
+
+# --- Conditionally Load .env for Development ---
+if APP_ENV == 'development':
+    try:
+        from dotenv import load_dotenv
+        ENV_PATH = BASE_DIR / '.env'
+        if ENV_PATH.is_file(): # Check if .env file actually exists
+            print(f"INFO: APP_ENV is '{APP_ENV}'. Loading environment variables from: {ENV_PATH}")
+            load_dotenv(dotenv_path=ENV_PATH, override=True) # override=True allows .env to change vars already in OS env
+        else:
+            print(f"INFO: APP_ENV is '{APP_ENV}'. .env file not found at {ENV_PATH}. Using OS environment variables only.")
+    except ImportError:
+        print(f"WARNING: APP_ENV is '{APP_ENV}' but 'python-dotenv' is not installed. Cannot load .env file. Ensure it's in your development requirements.")
+    except Exception as e:
+        print(f"WARNING: APP_ENV is '{APP_ENV}'. Error loading .env file: {e}. Using OS environment variables only.")
+# In production (APP_ENV != 'development'), the above block is skipped.
 
 # --- Core Security Settings ---
+# These os.getenv() calls will now fetch from:
+# 1. Actual OS environment variables (this is the case in production).
+# 2. .env file variables (if APP_ENV was 'development' and .env was loaded).
 
-# SECURITY WARNING: keep the secret key used in production secret!
-# Load from environment variable
 SECRET_KEY = os.getenv('SECRET_KEY')
 if not SECRET_KEY:
-    raise ValueError("No SECRET_KEY set. Please set it in your .env file.")
+    # This check is critical, especially for production.
+    if APP_ENV == 'production':
+        raise ValueError("CRITICAL ERROR: No SECRET_KEY set in a production environment. Please set it via platform environment variables.")
+    else:
+        # In development, it's a strong warning if not in .env
+        print("WARNING: SECRET_KEY is not set. Please set it in your .env file or development environment.")
+        # You might still want to raise an error or provide a default insecure key for dev if you prefer:
+        # SECRET_KEY = "unsafe-dev-secret-key-for-local-only" # Only if you absolutely need one and can't set it
+        # print("WARNING: Using an unsafe default SECRET_KEY for development. DO NOT USE IN PRODUCTION.")
+
 
 # SECURITY WARNING: don't run with debug turned on in production!
-# Load from environment variable, default to False if not set or invalid
+# DEBUG is determined by the 'DEBUG' environment variable.
+# In production, 'DEBUG' should be explicitly 'False' or not set (defaulting to False).
+# In development, .env (if loaded) or your shell can set 'DEBUG=True'.
 DEBUG = os.getenv('DEBUG', 'False').lower() in ('true', '1', 't')
 
-# Define allowed hosts. Start with development hosts.
-# For production, replace with your actual domain(s) or load from env var.
+# Define allowed hosts.
+# Start with a base list for production.
 ALLOWED_HOSTS = [
     'mmc-backend-gdgvg2hpf3c2dagx.uaenorth-01.azurewebsites.net',
-    'localhost',
-    '127.0.0.1',
 ]
+# Add development hosts if DEBUG is True
 if DEBUG:
-    ALLOWED_HOSTS = [
-    'mmc-backend-gdgvg2hpf3c2dagx.uaenorth-01.azurewebsites.net',
-    'localhost',
-    '127.0.0.1',
-]
-# Example for production using environment variable:
-# ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', '').split(',') if os.getenv('ALLOWED_HOSTS') else []
+    ALLOWED_HOSTS.extend(['localhost', '127.0.0.1'])
+# You can also load this from an environment variable for more flexibility:
+# ALLOWED_HOSTS_ENV = os.getenv('ALLOWED_HOSTS', '')
+# if ALLOWED_HOSTS_ENV:
+#     ALLOWED_HOSTS.extend([h.strip() for h in ALLOWED_HOSTS_ENV.split(',')])
 
 
 # --- Application Definition ---
@@ -65,18 +91,18 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
 
     # Third-Party Apps
-    'rest_framework',           # Django REST Framework for APIs
-    'pgvector',                 # Supabase pgvector support
-    'django_filters',           # For filtering in DRF views
-    'corsheaders',              # CORS headers for API access
+    'rest_framework',
+    'pgvector',
+    'django_filters',
+    'corsheaders',
 
     # Your Local Apps
-    'api.apps.ApiConfig',       # Reference your api app's config class
+    'api.apps.ApiConfig',
 ]
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
-    'corsheaders.middleware.CorsMiddleware',    # CORS middleware - must be before CommonMiddleware
+    'corsheaders.middleware.CorsMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -86,17 +112,19 @@ MIDDLEWARE = [
 ]
 
 # CORS settings
-# For development only - allows all origins
-if DEBUG:
+if DEBUG: # More permissive for local development
     CORS_ALLOW_ALL_ORIGINS = True
-else:
+    print("INFO: DEBUG is True, CORS_ALLOW_ALL_ORIGINS is enabled.")
+else: # Stricter for production
     CORS_ALLOWED_ORIGINS = [
-        "http://localhost:3000",
-        "https://mmc-hwdxcbegc3cvg0dv.uaenorth-01.azurewebsites.net"
-        # Add production domains here
+        # "http://localhost:3000", # Typically not needed in production list
+        "https://mmc-hwdxcbegc3cvg0dv.uaenorth-01.azurewebsites.net", # Your frontend production URL
+        # Add other production frontend domains if any
     ]
+    CORS_ALLOW_ALL_ORIGINS = False # Ensure this is False for production if using specific origins
+    print(f"INFO: DEBUG is False, CORS_ALLOWED_ORIGINS set to: {CORS_ALLOWED_ORIGINS}")
 
-# If you want to allow credentials (cookies, authorization headers)
+
 CORS_ALLOW_CREDENTIALS = True
 
 ROOT_URLCONF = 'medical_assistant_project.urls'
@@ -104,7 +132,7 @@ ROOT_URLCONF = 'medical_assistant_project.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [], # Add template directories here if you build a Django frontend
+        'DIRS': [],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -121,157 +149,153 @@ WSGI_APPLICATION = 'medical_assistant_project.wsgi.application'
 
 
 # --- Database Configuration ---
-# https://docs.djangoproject.com/en/stable/ref/settings/#databases
-
 DATABASE_URL = os.getenv("DATABASE_URL")
 if not DATABASE_URL:
-    raise ValueError("No DATABASE_URL set. Please set it in your .env file (e.g., postgresql://user:pass@host:port/name)")
+    if APP_ENV == 'production':
+        raise ValueError("CRITICAL ERROR: No DATABASE_URL set in a production environment. Please set it via platform environment variables.")
+    else:
+        print("WARNING: DATABASE_URL is not set. Please set it in your .env file or development environment.")
+        # Fallback for local dev if you want, but better to require it in .env
+        # DATABASE_URL = "sqlite:///./db.sqlite3" # Example insecure fallback
+        # print(f"WARNING: Using fallback DATABASE_URL: {DATABASE_URL}")
 
-DATABASES = {
-    'default': dj_database_url.config(
+# Default to an empty dict if DATABASE_URL is not set (and we didn't raise an error for prod)
+DATABASES = {}
+if DATABASE_URL: # Only configure if DATABASE_URL is available
+    DATABASES['default'] = dj_database_url.config(
         default=DATABASE_URL,
-        conn_max_age=600, # Number of seconds database connections should persist
+        conn_max_age=600,
         engine='django.db.backends.postgresql' # Ensure PostgreSQL engine is used
     )
-}
-# Ensure the engine is explicitly PostgreSQL, dj_database_url usually handles this but good practice to confirm
-DATABASES['default']['ENGINE'] = 'django.db.backends.postgresql'
+    # Ensure the engine is explicitly PostgreSQL, dj_database_url usually handles this
+    if 'default' in DATABASES:
+         DATABASES['default']['ENGINE'] = 'django.db.backends.postgresql'
+else:
+    # Handle the case where DATABASE_URL is not set, perhaps by setting up a dummy
+    # database config or raising an error earlier. For now, DATABASES will be empty.
+    print("CRITICAL WARNING: DATABASES setting is empty because DATABASE_URL was not provided.")
 
 
 # --- Password Validation ---
-# https://docs.djangoproject.com/en/stable/ref/settings/#auth-password-validators
-
 AUTH_PASSWORD_VALIDATORS = [
-    {
-        'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
-    },
+    {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',},
+    {'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',},
+    {'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',},
+    {'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',},
 ]
 
 
 # --- Internationalization ---
-# https://docs.djangoproject.com/en/stable/topics/i18n/
-
-LANGUAGE_CODE = 'en-nz' # Set to New Zealand English
-
-TIME_ZONE = 'Pacific/Auckland' # Set to New Zealand Time Zone
-
+LANGUAGE_CODE = 'en-nz'
+TIME_ZONE = 'Pacific/Auckland'
 USE_I18N = True
-
-USE_TZ = True # Use timezone-aware datetimes
+USE_TZ = True
 
 
 # --- Static files (CSS, JavaScript, Images) ---
-# https://docs.djangoproject.com/en/stable/howto/static-files/
-
 STATIC_URL = 'static/'
-# Defines the URL prefix for static files (e.g., /static/css/style.css)
-
-# Additional locations of static files
-STATICFILES_DIRS = [
-    # BASE_DIR / "static", # Uncomment if you have a project-wide static directory
-]
-
-# Directory where collectstatic will gather static files for deployment
+STATICFILES_DIRS = []
 STATIC_ROOT = BASE_DIR / "staticfiles"
 
 
-# --- Media Files (User Uploads - Not used for Supabase Storage in this guide) ---
-# MEDIA_URL = '/media/'
-# MEDIA_ROOT = BASE_DIR / 'media'
-
-
 # --- Default primary key field type ---
-# https://docs.djangoproject.com/en/stable/ref/settings/#default-auto-field
-
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 
 # --- Custom Project Settings ---
 
-# Supabase Configuration (loaded from .env)
+# Supabase Configuration (loaded from .env in dev, or platform env vars in prod)
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_ANON_KEY = os.getenv("SUPABASE_ANON_KEY")
-SUPABASE_SERVICE_KEY = os.getenv("SUPABASE_SERVICE_KEY") # For backend operations
+SUPABASE_SERVICE_KEY = os.getenv("SUPABASE_SERVICE_KEY")
 
-if not all([SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_KEY]):
-    print("WARNING: Supabase environment variables (URL, ANON_KEY, SERVICE_KEY) are not fully set.")
-    # Consider raising an error if these are strictly required at startup
-    # raise ValueError("Supabase URL/Keys missing in .env")
+if APP_ENV == 'production' and not all([SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_KEY]):
+    # In production, these might be critical
+    print("WARNING: Supabase environment variables (URL, ANON_KEY, SERVICE_KEY) are not fully set in production.")
+    # raise ValueError("Supabase URL/Keys missing in production environment.") # Uncomment if strictly required
+elif APP_ENV == 'development' and not all([SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_KEY]):
+    print("INFO: Supabase environment variables (URL, ANON_KEY, SERVICE_KEY) are not fully set for development (from .env or OS env).")
 
 # Hugging Face Configuration
 HUGGINGFACEHUB_API_TOKEN = os.getenv("HUGGINGFACEHUB_API_TOKEN")
 if not HUGGINGFACEHUB_API_TOKEN:
-    print("WARNING: HUGGINGFACEHUB_API_TOKEN not set in .env. Access to Hugging Face Inference API will fail.")
-    # You might only need this if actually using the HF Inference API endpoint type.
+    if APP_ENV == 'production': # More critical in production if used
+        print("WARNING: HUGGINGFACEHUB_API_TOKEN not set in .env/environment for production.")
+    else:
+        print("INFO: HUGGINGFACEHUB_API_TOKEN not set in .env/environment for development.")
 
 
 # --- Django REST Framework Settings ---
-# https://www.django-rest-framework.org/api-guide/settings/
-
 REST_FRAMEWORK = {
-    # Use Django's standard `django.contrib.auth` permissions,
-    # or restrict access globally. Start with AllowAny for easier dev/testing.
-    'DEFAULT_PERMISSION_CLASSES': [
-        'rest_framework.permissions.AllowAny',
-        # Examples for later:
-        # 'rest_framework.permissions.IsAuthenticated', # Requires login
-        # 'rest_framework.permissions.IsAdminUser', # Requires admin status
-    ],
-    'DEFAULT_AUTHENTICATION_CLASSES': [
-        # Add authentication classes here as needed (e.g., TokenAuthentication)
-        # 'rest_framework.authentication.TokenAuthentication',
-        # 'rest_framework.authentication.SessionAuthentication', # If using Django login
-    ],
-    'DEFAULT_FILTER_BACKENDS': [
-        # Enable DjangoFilterBackend globally for easier list filtering
-        'django_filters.rest_framework.DjangoFilterBackend',
-    ],
+    'DEFAULT_PERMISSION_CLASSES': ['rest_framework.permissions.AllowAny',],
+    'DEFAULT_AUTHENTICATION_CLASSES': [],
+    'DEFAULT_FILTER_BACKENDS': ['django_filters.rest_framework.DjangoFilterBackend',],
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
-    'PAGE_SIZE': 20 # Example: Set default page size for paginated results
+    'PAGE_SIZE': 20
 }
 
-# --- Logging Configuration (Optional but Recommended) ---
-# Basic example, can be customized further
-# settings.py
+# --- Logging Configuration ---
+
+# Define logging level and formatter based on DEBUG status.
+# In production (DEBUG=False), less verbose logging is generally preferred.
+if DEBUG:
+    # Development settings: more verbose
+    EFFECTIVE_LOG_LEVEL = 'DEBUG'
+    CONSOLE_LOG_FORMATTER = 'verbose_dev'
+else:
+    # Production settings: less verbose
+    # You can change 'INFO' to 'WARNING' or 'ERROR' if you want fewer log messages.
+    # - 'INFO': Shows informational messages, warnings, and errors. A common default for production.
+    # - 'WARNING': Shows only warnings and errors. Use if INFO level is too noisy.
+    # - 'ERROR': Shows only critical errors.
+    EFFECTIVE_LOG_LEVEL = 'INFO'  # <<< CHANGE TO 'WARNING' or 'ERROR' for less production logging volume
+    CONSOLE_LOG_FORMATTER = 'concise_prod'
+
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
-    'formatters': { # Optional: Add a more detailed formatter
-        'verbose': {
+    'formatters': {
+        'verbose_dev': {  # Detailed formatter, typically for development (DEBUG=True)
             'format': '{levelname} {asctime} {module} {process:d} {thread:d} {message}',
             'style': '{',
+        },
+        'concise_prod': {  # Less detailed formatter, for production (DEBUG=False)
+            # Shows timestamp, level, and the message. Omits module, process, thread.
+            'format': '[{asctime}] {levelname}: {message}',
+            'style': '{',
+            # Alternative concise format (includes logger name, e.g., 'django.request'):
+            # 'format': '[{asctime}] {levelname} [%(name)s]: {message}',
         },
     },
     'handlers': {
         'console': {
             'class': 'logging.StreamHandler',
-            'formatter': 'verbose', # Use the verbose formatter
+            'formatter': CONSOLE_LOG_FORMATTER,  # Uses the formatter selected above
         },
     },
-    'root': {
+    'root': {  # Catch-all logger for messages not handled by specific loggers
         'handlers': ['console'],
-        'level': 'DEBUG', # More verbose
+        'level': EFFECTIVE_LOG_LEVEL,  # Uses the log level selected above
     },
     'loggers': {
-        'django': {
+        'django': {  # Specific settings for Django's internal loggers
             'handlers': ['console'],
-            'level': 'DEBUG', # More verbose
-            'propagate': True, # Allow django logs to also go to root
+            # You can set a different level for Django's logs if needed,
+            # e.g., 'WARNING' even if root is 'INFO'.
+            'level': EFFECTIVE_LOG_LEVEL,
+            'propagate': False,  # Prevent django logs from also going to the root logger
         },
-        'api': {
+        'api': {  # Your application's logger (assuming 'api' is an app name)
             'handlers': ['console'],
-            'level': 'DEBUG',
-            'propagate': True,
+            'level': EFFECTIVE_LOG_LEVEL,
+            'propagate': False,
         },
-        # Add other specific loggers if needed
+        # Example: To make a specific third-party library less noisy, especially in production
+        # 'noisy_library_name': {
+        #     'handlers': ['console'],
+        #     'level': 'WARNING' if not DEBUG else EFFECTIVE_LOG_LEVEL, # Quieter in production
+        #     'propagate': False,
+        # },
     },
 }
+print(f"INFO: Django settings loaded. APP_ENV='{APP_ENV}', DEBUG={DEBUG}")
