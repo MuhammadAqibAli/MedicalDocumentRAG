@@ -248,7 +248,7 @@ else:
     # - 'INFO': Shows informational messages, warnings, and errors. A common default for production.
     # - 'WARNING': Shows only warnings and errors. Use if INFO level is too noisy.
     # - 'ERROR': Shows only critical errors.
-    EFFECTIVE_LOG_LEVEL = 'INFO'  # <<< CHANGE TO 'WARNING' or 'ERROR' for less production logging volume
+    EFFECTIVE_LOG_LEVEL = 'ERROR'  # Set to ERROR to minimize log output
     CONSOLE_LOG_FORMATTER = 'concise_prod'
 
 LOGGING = {
@@ -284,6 +284,11 @@ LOGGING = {
             # e.g., 'WARNING' even if root is 'INFO'.
             'level': EFFECTIVE_LOG_LEVEL,
             'propagate': False,  # Prevent django logs from also going to the root logger
+        },
+        'django.db.backends': {  # Disable SQL query logging
+            'handlers': ['console'],
+            'level': 'ERROR',  # Only show errors, not queries
+            'propagate': False,
         },
         'api': {  # Your application's logger (assuming 'api' is an app name)
             'handlers': ['console'],

@@ -2,6 +2,7 @@ from django.db import models
 from pgvector.django import VectorField
 import uuid
 import json
+from django.contrib.auth.models import User
 
 class Document(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -94,6 +95,105 @@ class AuditQuestion(models.Model):
 
     def __str__(self):
         return f"Audit question for {self.policy_name}"
+
+class Practice(models.Model):
+    """
+    Model for storing medical practices.
+    """
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    name = models.CharField(max_length=255)
+    address = models.TextField(null=True, blank=True)
+    contact_number = models.CharField(max_length=50, null=True, blank=True)
+    email = models.EmailField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    is_active = models.BooleanField(default=True)
+
+    def __str__(self):
+        return self.name
+
+class FeedbackMethod(models.Model):
+    """
+    Model for storing feedback methods (e.g., Email, Phone, In-person, etc.)
+    """
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    name = models.CharField(max_length=100)
+    description = models.TextField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return self.name
+
+class Feedback(models.Model):
+    """
+    Model for storing patient feedback.
+    """
+    # Status choices
+    STATUS_NEW = 'New'
+    STATUS_IN_PROGRESS = 'In Progress'
+    STATUS_PENDING_REVIEW = 'Pending Review'
+    STATUS_RESOLVED = 'Resolved'
+    STATUS_CLOSED = 'Closed'
+
+    STATUS_CHOICES = [
+        (STATUS_NEW, 'New'),
+        (STATUS_IN_PROGRESS, 'In Progress'),
+        (STATUS_PENDING_REVIEW, 'Pending Review'),
+        (STATUS_RESOLVED, 'Resolved'),
+        (STATUS_CLOSED, 'Closed'),
+    ]
+
+    # Required fields
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    title = models.CharField(max_length=255)
+    reference_number = models.CharField(max_length=50, unique=True, blank=True)
+    practice = models.ForeignKey(Practice, on_delete=models.CASCADE, related_name='feedback')
+    form_date = models.DateField()
+    submitter = models.ForeignKey(User, on_delete=models.CASCADE, related_name='submitted_feedback')
+    patient_nhi = models.CharField(max_length=100)
+    feedback_details = models.TextField()
+
+    # Optional fields
+    group = models.CharField(max_length=100, null=True, blank=True)
+    email = models.EmailField(null=True, blank=True)
+    date_received = models.DateField(null=True, blank=True)
+    feedback_method = models.ForeignKey(FeedbackMethod, on_delete=models.SET_NULL, null=True, blank=True)
+    other_comments = models.TextField(null=True, blank=True)
+    management_owner = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='managed_feedback')
+    review_requested_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='review_requested_feedback')
+
+    # System-managed fields
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_NEW)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"{self.title} - {self.reference_number}"
+
+    def save(self, *args, **kwargs):
+        # Generate reference number if not provided
+        if not self.reference_number:
+            # Format: FB-YYYYMMDD-XXXX (where XXXX is a random 4-digit number)
+            import random
+            from datetime import date
+            today = date.today().strftime('%Y%m%d')
+            random_digits = str(random.randint(1000, 9999))
+            self.reference_number = f"FB-{today}-{random_digits}"
+
+        super().save(*args, **kwargs)
+
+class FeedbackAttachment(models.Model):
+    """
+    Model for storing attachments related to feedback.
+    """
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    feedback = models.ForeignKey(Feedback, on_delete=models.CASCADE, related_name='attachments')
+    file_name = models.CharField(max_length=255)
+    supabase_storage_path = models.CharField(max_length=1024)
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Attachment for {self.feedback.reference_number}: {self.file_name}"
 
 
 class Complaint(models.Model):

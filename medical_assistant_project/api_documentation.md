@@ -820,7 +820,197 @@ Compare two standard contents and analyze their differences using LLM.
 }
 ```
 
+## Audit Questions API
 
+The Audit Questions API allows you to generate, retrieve, update, and delete audit questions based on specific policies.
 
+### List Audit Questions
 
+Retrieve a list of all audit questions with optional filtering by policy name.
 
+**Endpoint:** `GET /api/audit-questions/`
+
+**Query Parameters:**
+- `policy_name` (optional): Filter questions by policy name (case-insensitive, partial match)
+
+**Request:**
+```http
+GET /api/audit-questions/?policy_name=Privacy HTTP/1.1
+```
+
+**Response (Success):**
+```json
+[
+  {
+    "id": "a1b2c3d4-e5f6-7890-abcd-1234567890ab",
+    "question_text": "Does the organization have a documented process for handling data breaches?",
+    "policy_name": "Data Privacy Policy",
+    "ai_model": "gpt-4o",
+    "options": ["Compliant", "Partial Compliant", "Non Compliant"],
+    "created_at": "2024-05-20T14:30:45Z",
+    "updated_at": "2024-05-20T14:30:45Z"
+  },
+  {
+    "id": "b2c3d4e5-f6a7-8901-bcde-23456789abcd",
+    "question_text": "Are all staff members required to complete privacy training annually?",
+    "policy_name": "Data Privacy Policy",
+    "ai_model": "gpt-4o",
+    "options": ["Compliant", "Partial Compliant", "Non Compliant"],
+    "created_at": "2024-05-20T14:30:45Z",
+    "updated_at": "2024-05-20T14:30:45Z"
+  }
+]
+```
+
+**Response (Empty):**
+```json
+[]
+```
+
+### Generate Audit Questions
+
+Generate audit questions based on a specific policy using an AI model.
+
+**Endpoint:** `POST /api/audit-questions/generate/`
+
+**Request:**
+```json
+{
+  "ai_model": "gpt-4o",
+  "policy_name": "Data Privacy Policy",
+  "number_of_questions": 5
+}
+```
+
+**Request Parameters:**
+- `ai_model` (string, required): The AI model to use from OpenRouter (e.g., "gpt-4o", "gpt-4.1", "gemini-2.5-pro-preview")
+- `policy_name` (string, required): The name of the policy to generate questions about
+- `number_of_questions` (integer, required): The total number of questions to generate (1-50)
+
+**Response (Success):**
+```json
+[
+  {
+    "id": "a1b2c3d4-e5f6-7890-abcd-1234567890ab",
+    "question_text": "Does the organization have a documented process for handling data breaches?",
+    "policy_name": "Data Privacy Policy",
+    "ai_model": "gpt-4o",
+    "options": ["Compliant", "Partial Compliant", "Non Compliant"],
+    "created_at": "2024-05-20T14:30:45Z",
+    "updated_at": "2024-05-20T14:30:45Z"
+  },
+  {
+    "id": "b2c3d4e5-f6a7-8901-bcde-23456789abcd",
+    "question_text": "Are all staff members required to complete privacy training annually?",
+    "policy_name": "Data Privacy Policy",
+    "ai_model": "gpt-4o",
+    "options": ["Compliant", "Partial Compliant", "Non Compliant"],
+    "created_at": "2024-05-20T14:30:45Z",
+    "updated_at": "2024-05-20T14:30:45Z"
+  },
+  {
+    "id": "c3d4e5f6-a7b8-9012-cdef-456789abcde0",
+    "question_text": "Is there a designated Data Protection Officer responsible for privacy compliance?",
+    "policy_name": "Data Privacy Policy",
+    "ai_model": "gpt-4o",
+    "options": ["Compliant", "Partial Compliant", "Non Compliant"],
+    "created_at": "2024-05-20T14:30:45Z",
+    "updated_at": "2024-05-20T14:30:45Z"
+  },
+  {
+    "id": "d4e5f6a7-b8c9-0123-defg-56789abcdef1",
+    "question_text": "Does the organization maintain a register of all personal data processing activities?",
+    "policy_name": "Data Privacy Policy",
+    "ai_model": "gpt-4o",
+    "options": ["Compliant", "Partial Compliant", "Non Compliant"],
+    "created_at": "2024-05-20T14:30:45Z",
+    "updated_at": "2024-05-20T14:30:45Z"
+  },
+  {
+    "id": "e5f6a7b8-c9d0-1234-efgh-6789abcdef12",
+    "question_text": "Are data protection impact assessments conducted for high-risk processing activities?",
+    "policy_name": "Data Privacy Policy",
+    "ai_model": "gpt-4o",
+    "options": ["Compliant", "Partial Compliant", "Non Compliant"],
+    "created_at": "2024-05-20T14:30:45Z",
+    "updated_at": "2024-05-20T14:30:45Z"
+  }
+]
+```
+
+**Response (Error):**
+```json
+{
+  "error": "Failed to parse generated content as JSON"
+}
+```
+
+### Update Audit Question
+
+Update a specific audit question by its ID.
+
+**Endpoint:** `PUT /api/audit-questions/{question_id}/`
+
+**Request:**
+```json
+{
+  "question_text": "Updated question text: Does the organization have a documented process for handling and reporting data breaches within 72 hours?",
+  "options": ["Compliant", "Partial Compliant", "Non Compliant", "Not Applicable"]
+}
+```
+
+**Request Parameters:**
+- `question_text` (string, optional): The updated text of the audit question
+- `policy_name` (string, optional): The updated policy name
+- `options` (array, optional): The updated list of options for the question
+
+**Response (Success):**
+```json
+{
+  "id": "a1b2c3d4-e5f6-7890-abcd-1234567890ab",
+  "question_text": "Updated question text: Does the organization have a documented process for handling and reporting data breaches within 72 hours?",
+  "policy_name": "Data Privacy Policy",
+  "ai_model": "gpt-4o",
+  "options": ["Compliant", "Partial Compliant", "Non Compliant", "Not Applicable"],
+  "created_at": "2024-05-20T14:30:45Z",
+  "updated_at": "2024-05-20T15:45:30Z"
+}
+```
+
+**Response (Error):**
+```json
+{
+  "error": "Audit question not found"
+}
+```
+
+### Delete Audit Question
+
+Delete a specific audit question by its ID.
+
+**Endpoint:** `DELETE /api/audit-questions/{question_id}/delete/`
+
+**Request:**
+```http
+DELETE /api/audit-questions/a1b2c3d4-e5f6-7890-abcd-1234567890ab/delete/ HTTP/1.1
+```
+
+**Response (Success):**
+```
+204 No Content
+```
+
+**Response (Error):**
+```json
+{
+  "error": "Audit question not found"
+}
+```
+
+## Additional API Documentation
+
+For detailed documentation on the Feedback Management API, please refer to the following files:
+
+1. [Feedback API Documentation - Part 1](feedback_api_documentation.md)
+2. [Feedback API Documentation - Part 2](feedback_api_documentation_part2.md)
+3. [Feedback API Documentation - Part 3](feedback_api_documentation_part3.md)
