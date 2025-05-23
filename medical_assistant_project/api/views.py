@@ -1,9 +1,13 @@
 from rest_framework import generics, viewsets, status, views, filters
 from rest_framework.response import Response
-from rest_framework.parsers import MultiPartParser, FormParser
+from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from rest_framework.exceptions import APIException
+from rest_framework.decorators import action
 from django_filters.rest_framework import DjangoFilterBackend # For filtering list views
-from .models import Document, GeneratedContent, Standard, StandardType, QuestionOption, AuditQuestion
+from .models import (
+    Document, GeneratedContent, Standard, StandardType, QuestionOption, AuditQuestion,
+    Practice, FeedbackMethod, Feedback, FeedbackAttachment
+)
 from .serializers import (
     DocumentSerializer,
     GeneratedContentSerializer,
@@ -13,13 +17,21 @@ from .serializers import (
     StandardDetailSerializer,
     QuestionOptionSerializer,
     AuditQuestionSerializer,
-    AuditQuestionGenerationRequestSerializer
+    AuditQuestionGenerationRequestSerializer,
+    PracticeSerializer,
+    FeedbackMethodSerializer,
+    FeedbackSerializer,
+    FeedbackListSerializer,
+    FeedbackAttachmentSerializer
 )
-from .services import document_processor, rag_retriever, llm_engine, validator
+from .services import document_processor, rag_retriever, llm_engine, validator, feedback_processor
 from .services.validator import VALIDATION_MODEL_NAME
 import logging
 import re
 import json
+from django.db.models import Q
+from django.utils import timezone
+from datetime import timedelta
 logger = logging.getLogger(__name__)
 
 class ServiceUnavailable(APIException):
@@ -673,3 +685,132 @@ class AuditQuestionListView(views.APIView):
 
         serializer = AuditQuestionSerializer(queryset, many=True)
         return Response(serializer.data)
+
+class PracticeViewSet(viewsets.ModelViewSet):
+    """
+    API endpoint for managing medical practices.
+    """
+    queryset = Practice.objects.filter(is_active=True)
+    serializer_class = PracticeSerializer
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter]
+    filterset_fields = ['name', 'is_active']
+    search_fields = ['name', 'address', 'email']
+
+class FeedbackMethodViewSet(viewsets.ModelViewSet):
+    """
+    API endpoint for managing feedback methods.
+    """
+    queryset = FeedbackMethod.objects.all()
+    serializer_class = FeedbackMethodSerializer
+
+class FeedbackViewSet(viewsets.ModelViewSet):
+    """
+    API endpoint for managing patient feedback.
+    Supports filtering by status, practice, submitter, date ranges, etc.
+    """
+    queryset = Feedback.objects.all().order_by('-created_at')
+    parser_classes = (MultiPartParser, FormParser, JSONParser)
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter]
+    filterset_fields = {
+        'status': ['exact'],
+        'practice': ['exact'],
+        'submitter': ['exact'],
+        'management_owner': ['exact'],
+        'review_requested_by': ['exact'],
+        'form_date': ['gte', 'lte', 'exact'],
+        'date_received': ['gte', 'lte', 'exact'],
+        'created_at': ['gte', 'lte', 'date__gte', 'date__lte'],
+    }
+    search_fields = ['title', 'reference_number', 'patient_nhi', 'feedback_details']
+
+    def get_serializer_class(self):
+        """
+        Return different serializers for list and detail views.
+        """
+        if self.action == 'list':
+            return FeedbackListSerializer
+        return FeedbackSerializer
+
+    def create(self, request, *args, **kwargs):
+        """
+        Create a new feedback entry with optional file attachments.
+        """
+        # Extract files from request
+        files = request.FILES.getlist('attachments')
+
+        # Create serializer with data
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        # Save feedback instance
+        feedback = serializer.save()
+
+        # Process attachments if any
+        if files:
+            for file in files:
+                try:
+                    feedback_processor.process_and_store_attachment(file, feedback)
+                except Exception as e:
+                    logger.error(f"Error processing attachment: {e}")
+                    # Continue with other attachments even if one fails
+
+        # Return the created feedback with updated serializer that includes attachments
+        serializer = self.get_serializer(feedback)
+        headers = self.get_success_headers(serializer.data)
+        return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+
+    @action(detail=True, methods=['post'])
+    def add_attachment(self, request, pk=None):
+        """
+        Add an attachment to an existing feedback entry.
+        """
+        feedback = self.get_object()
+        file = request.FILES.get('file')
+
+        if not file:
+            return Response({"error": "No file provided"}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            attachment = feedback_processor.process_and_store_attachment(file, feedback)
+            serializer = FeedbackAttachmentSerializer(attachment)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        except Exception as e:
+            logger.error(f"Error adding attachment: {e}")
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    @action(detail=True, methods=['delete'])
+    def remove_attachment(self, request, pk=None):
+        """
+        Remove an attachment from a feedback entry.
+        """
+        attachment_id = request.query_params.get('attachment_id')
+        if not attachment_id:
+            return Response({"error": "attachment_id parameter is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        success, error = feedback_processor.delete_feedback_attachment(attachment_id)
+        if error:
+            status_code = status.HTTP_404_NOT_FOUND if "not found" in error else status.HTTP_500_INTERNAL_SERVER_ERROR
+            return Response({"error": error}, status=status_code)
+
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+class FeedbackAttachmentDownloadView(views.APIView):
+    """
+    API endpoint for downloading feedback attachments.
+    """
+    def get(self, request, attachment_id, *args, **kwargs):
+        """
+        Downloads a feedback attachment file from Supabase storage.
+        """
+        file_content, file_name, content_type, error = feedback_processor.get_feedback_attachment(attachment_id)
+
+        if error:
+            status_code = status.HTTP_404_NOT_FOUND if "not found" in error else status.HTTP_500_INTERNAL_SERVER_ERROR
+            return Response({"error": error}, status=status_code)
+
+        # Create Django response with file content
+        from django.http import HttpResponse
+        response = HttpResponse(file_content, content_type=content_type)
+        response['Content-Disposition'] = f'attachment; filename="{file_name}"'
+
+        return response
