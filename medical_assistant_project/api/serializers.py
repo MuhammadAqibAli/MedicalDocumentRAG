@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Document, GeneratedContent, DocumentChunk, Standard, StandardType, QuestionOption, AuditQuestion
+from .models import Document, GeneratedContent, DocumentChunk, Standard, StandardType, QuestionOption, AuditQuestion, Complaint
 from .services.llm_engine import AVAILABLE_MODELS
 
 class DocumentSerializer(serializers.ModelSerializer):
@@ -67,3 +67,22 @@ class AuditQuestionGenerationRequestSerializer(serializers.Serializer):
     ai_model = serializers.ChoiceField(choices=list(AVAILABLE_MODELS.keys()), required=True)
     policy_name = serializers.CharField(max_length=255, required=True)
     number_of_questions = serializers.IntegerField(min_value=1, max_value=50, required=True)
+
+
+class ComplaintSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Complaint
+        fields = [
+            'id', 'title', 'reference_number', 'practice', 'form_date',
+            'reporter_name', 'group', 'email', 'patient_name', 'patient_nhi',
+            'patient_dob', 'patient_email', 'patient_phone', 'is_acknowledged',
+            'received_date', 'complaint_method', 'complaint_severity',
+            'complaint_owner', 'complaint_details', 'action_taken',
+            'is_notified_external', 'other_comments', 'file_upload_path',
+            'request_review_by', 'complaint_reason', 'is_resolved',
+            'identified_issues', 'staff_skill_issues', 'policy_impact',
+            'is_disclosure_required', 'is_followup_required',
+            'is_event_analysis_required', 'is_training_required',
+            'is_visible_to_users', 'disable_editing', 'created_at', 'updated_at'
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at', 'file_upload_path']

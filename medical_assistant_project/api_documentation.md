@@ -468,6 +468,301 @@ Retrieve a list of all standard types.
 ]
 ```
 
+## Complaint Management API
+
+### List Complaints
+
+Retrieve a list of all complaints.
+
+**Endpoint:** `GET /api/complaints/`
+
+**Request:**
+```http
+GET /api/complaints/ HTTP/1.1
+```
+
+**Response (Success):**
+```json
+[
+  {
+    "id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+    "title": "Medication Error",
+    "reference_number": "COMP-2024-001",
+    "practice": "Auckland Medical Center",
+    "form_date": "2024-05-15",
+    "reporter_name": "Jane Smith",
+    "group": "Nursing",
+    "email": "jane.smith@example.com",
+    "patient_name": "John Doe",
+    "patient_nhi": "ABC1234",
+    "patient_dob": "1980-01-15",
+    "patient_email": "john.doe@example.com",
+    "patient_phone": "+64 21 123 4567",
+    "is_acknowledged": true,
+    "received_date": "2024-05-10",
+    "complaint_method": "Email",
+    "complaint_severity": "Medium",
+    "complaint_owner": "Dr. Robert Johnson",
+    "complaint_details": "Patient received incorrect medication dosage",
+    "action_taken": "Immediate correction of medication and patient monitoring",
+    "is_notified_external": false,
+    "other_comments": "Patient was satisfied with the quick response",
+    "file_upload_path": "complaints/uuid_document.pdf",
+    "request_review_by": "Medical Director",
+    "complaint_reason": "Medication error during hospital stay",
+    "is_resolved": true,
+    "identified_issues": "Pharmacy verification process needs improvement",
+    "staff_skill_issues": "Additional training needed for new staff",
+    "policy_impact": "Current medication verification policy was not followed",
+    "is_disclosure_required": true,
+    "is_followup_required": true,
+    "is_event_analysis_required": true,
+    "is_training_required": true,
+    "is_visible_to_users": true,
+    "disable_editing": false,
+    "created_at": "2024-05-10T14:30:45Z",
+    "updated_at": "2024-05-15T09:20:30Z"
+  }
+]
+```
+
+### Get Complaint
+
+Retrieve a specific complaint by ID.
+
+**Endpoint:** `GET /api/complaints/{complaint_id}/`
+
+**Request:**
+```http
+GET /api/complaints/f47ac10b-58cc-4372-a567-0e02b2c3d479/ HTTP/1.1
+```
+
+**Response (Success):**
+```json
+{
+  "id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+  "title": "Medication Error",
+  "reference_number": "COMP-2024-001",
+  "practice": "Auckland Medical Center",
+  "form_date": "2024-05-15",
+  "reporter_name": "Jane Smith",
+  "group": "Nursing",
+  "email": "jane.smith@example.com",
+  "patient_name": "John Doe",
+  "patient_nhi": "ABC1234",
+  "patient_dob": "1980-01-15",
+  "patient_email": "john.doe@example.com",
+  "patient_phone": "+64 21 123 4567",
+  "is_acknowledged": true,
+  "received_date": "2024-05-10",
+  "complaint_method": "Email",
+  "complaint_severity": "Medium",
+  "complaint_owner": "Dr. Robert Johnson",
+  "complaint_details": "Patient received incorrect medication dosage",
+  "action_taken": "Immediate correction of medication and patient monitoring",
+  "is_notified_external": false,
+  "other_comments": "Patient was satisfied with the quick response",
+  "file_upload_path": "complaints/uuid_document.pdf",
+  "request_review_by": "Medical Director",
+  "complaint_reason": "Medication error during hospital stay",
+  "is_resolved": true,
+  "identified_issues": "Pharmacy verification process needs improvement",
+  "staff_skill_issues": "Additional training needed for new staff",
+  "policy_impact": "Current medication verification policy was not followed",
+  "is_disclosure_required": true,
+  "is_followup_required": true,
+  "is_event_analysis_required": true,
+  "is_training_required": true,
+  "is_visible_to_users": true,
+  "disable_editing": false,
+  "created_at": "2024-05-10T14:30:45Z",
+  "updated_at": "2024-05-15T09:20:30Z"
+}
+```
+
+**Response (Error):**
+```json
+{
+  "error": "Complaint with ID f47ac10b-58cc-4372-a567-0e02b2c3d479 not found."
+}
+```
+
+### Create Complaint
+
+Create a new complaint.
+
+**Endpoint:** `POST /api/complaints/`
+
+**Request:**
+```http
+POST /api/complaints/ HTTP/1.1
+Content-Type: multipart/form-data
+
+{
+  "title": "Medication Error",
+  "reference_number": "COMP-2024-001",
+  "practice": "Auckland Medical Center",
+  "form_date": "2024-05-15",
+  "reporter_name": "Jane Smith",
+  "group": "Nursing",
+  "email": "jane.smith@example.com",
+  "patient_name": "John Doe",
+  "patient_nhi": "ABC1234",
+  "patient_dob": "1980-01-15",
+  "patient_email": "john.doe@example.com",
+  "patient_phone": "+64 21 123 4567",
+  "is_acknowledged": true,
+  "received_date": "2024-05-10",
+  "complaint_method": "Email",
+  "complaint_severity": "Medium",
+  "complaint_owner": "Dr. Robert Johnson",
+  "complaint_details": "Patient received incorrect medication dosage",
+  "action_taken": "Immediate correction of medication and patient monitoring",
+  "is_notified_external": false,
+  "other_comments": "Patient was satisfied with the quick response",
+  "file_upload": [binary file content],
+  "request_review_by": "Medical Director",
+  "complaint_reason": "Medication error during hospital stay",
+  "is_resolved": true,
+  "identified_issues": "Pharmacy verification process needs improvement",
+  "staff_skill_issues": "Additional training needed for new staff",
+  "policy_impact": "Current medication verification policy was not followed",
+  "is_disclosure_required": true,
+  "is_followup_required": true,
+  "is_event_analysis_required": true,
+  "is_training_required": true,
+  "is_visible_to_users": true,
+  "disable_editing": false
+}
+```
+
+**Response (Success):**
+```json
+{
+  "id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+  "title": "Medication Error",
+  "reference_number": "COMP-2024-001",
+  "practice": "Auckland Medical Center",
+  "form_date": "2024-05-15",
+  "reporter_name": "Jane Smith",
+  "group": "Nursing",
+  "email": "jane.smith@example.com",
+  "patient_name": "John Doe",
+  "patient_nhi": "ABC1234",
+  "patient_dob": "1980-01-15",
+  "patient_email": "john.doe@example.com",
+  "patient_phone": "+64 21 123 4567",
+  "is_acknowledged": true,
+  "received_date": "2024-05-10",
+  "complaint_method": "Email",
+  "complaint_severity": "Medium",
+  "complaint_owner": "Dr. Robert Johnson",
+  "complaint_details": "Patient received incorrect medication dosage",
+  "action_taken": "Immediate correction of medication and patient monitoring",
+  "is_notified_external": false,
+  "other_comments": "Patient was satisfied with the quick response",
+  "file_upload_path": "complaints/uuid_document.pdf",
+  "request_review_by": "Medical Director",
+  "complaint_reason": "Medication error during hospital stay",
+  "is_resolved": true,
+  "identified_issues": "Pharmacy verification process needs improvement",
+  "staff_skill_issues": "Additional training needed for new staff",
+  "policy_impact": "Current medication verification policy was not followed",
+  "is_disclosure_required": true,
+  "is_followup_required": true,
+  "is_event_analysis_required": true,
+  "is_training_required": true,
+  "is_visible_to_users": true,
+  "disable_editing": false,
+  "created_at": "2024-05-10T14:30:45Z",
+  "updated_at": "2024-05-10T14:30:45Z"
+}
+```
+
+### Update Complaint
+
+Update an existing complaint.
+
+**Endpoint:** `PATCH /api/complaints/{complaint_id}/`
+
+**Request:**
+```http
+PATCH /api/complaints/f47ac10b-58cc-4372-a567-0e02b2c3d479/ HTTP/1.1
+Content-Type: multipart/form-data
+
+{
+  "is_resolved": true,
+  "identified_issues": "Updated: Pharmacy verification process needs improvement and staff training required",
+  "file_upload": [binary file content]
+}
+```
+
+**Response (Success):**
+```json
+{
+  "id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+  "title": "Medication Error",
+  "reference_number": "COMP-2024-001",
+  "practice": "Auckland Medical Center",
+  "form_date": "2024-05-15",
+  "reporter_name": "Jane Smith",
+  "group": "Nursing",
+  "email": "jane.smith@example.com",
+  "patient_name": "John Doe",
+  "patient_nhi": "ABC1234",
+  "patient_dob": "1980-01-15",
+  "patient_email": "john.doe@example.com",
+  "patient_phone": "+64 21 123 4567",
+  "is_acknowledged": true,
+  "received_date": "2024-05-10",
+  "complaint_method": "Email",
+  "complaint_severity": "Medium",
+  "complaint_owner": "Dr. Robert Johnson",
+  "complaint_details": "Patient received incorrect medication dosage",
+  "action_taken": "Immediate correction of medication and patient monitoring",
+  "is_notified_external": false,
+  "other_comments": "Patient was satisfied with the quick response",
+  "file_upload_path": "complaints/new_uuid_document.pdf",
+  "request_review_by": "Medical Director",
+  "complaint_reason": "Medication error during hospital stay",
+  "is_resolved": true,
+  "identified_issues": "Updated: Pharmacy verification process needs improvement and staff training required",
+  "staff_skill_issues": "Additional training needed for new staff",
+  "policy_impact": "Current medication verification policy was not followed",
+  "is_disclosure_required": true,
+  "is_followup_required": true,
+  "is_event_analysis_required": true,
+  "is_training_required": true,
+  "is_visible_to_users": true,
+  "disable_editing": false,
+  "created_at": "2024-05-10T14:30:45Z",
+  "updated_at": "2024-05-15T09:20:30Z"
+}
+```
+
+### Delete Complaint
+
+Delete a complaint by ID, including its file in storage.
+
+**Endpoint:** `DELETE /api/complaints/{complaint_id}/`
+
+**Request:**
+```http
+DELETE /api/complaints/f47ac10b-58cc-4372-a567-0e02b2c3d479/ HTTP/1.1
+```
+
+**Response (Success):**
+```
+204 No Content
+```
+
+**Response (Error):**
+```json
+{
+  "error": "Complaint with ID f47ac10b-58cc-4372-a567-0e02b2c3d479 not found."
+}
+```
+
 ### Compare Standards
 
 Compare two standard contents and analyze their differences using LLM.

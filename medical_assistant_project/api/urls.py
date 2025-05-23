@@ -12,7 +12,8 @@ from .views import (
     DocumentDownloadView,
     AuditQuestionGeneratorView,
     AuditQuestionUpdateView,
-    AuditQuestionDeleteView
+    AuditQuestionDeleteView,
+    ComplaintView
 )
 
 router = DefaultRouter()
@@ -37,4 +38,8 @@ urlpatterns = [
     path('audit-questions/generate/', AuditQuestionGeneratorView.as_view(), name='audit-question-generate'),
     path('audit-questions/<uuid:question_id>/', AuditQuestionUpdateView.as_view(), name='audit-question-update'),
     path('audit-questions/<uuid:question_id>/delete/', AuditQuestionDeleteView.as_view(), name='audit-question-delete'),
+
+    # Complaint endpoints
+    path('complaints/', ComplaintView.as_view(), name='complaint-list-create'),
+    path('complaints/<uuid:complaint_id>/', ComplaintView.as_view(), name='complaint-detail'),
 ]

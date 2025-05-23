@@ -6,7 +6,7 @@ load_dotenv()
 
 # OpenRouter Configuration
 # Try to get API key from environment variable first, then fall back to hardcoded value
-OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
+OPENROUTER_API_KEY = "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"
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 SITE_URL = "https://medical-document-assistant.nz"
 SITE_NAME = "NZ Medical Document Assistant"

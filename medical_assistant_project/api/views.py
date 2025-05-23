@@ -3,7 +3,7 @@ from rest_framework.response import Response
 from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.exceptions import APIException
 from django_filters.rest_framework import DjangoFilterBackend # For filtering list views
-from .models import Document, GeneratedContent, Standard, StandardType, QuestionOption, AuditQuestion
+from .models import Document, GeneratedContent, Standard, StandardType, QuestionOption, AuditQuestion, Complaint
 from .serializers import (
     DocumentSerializer,
     GeneratedContentSerializer,
@@ -13,9 +13,10 @@ from .serializers import (
     StandardDetailSerializer,
     QuestionOptionSerializer,
     AuditQuestionSerializer,
-    AuditQuestionGenerationRequestSerializer
+    AuditQuestionGenerationRequestSerializer,
+    ComplaintSerializer
 )
-from .services import document_processor, rag_retriever, llm_engine, validator
+from .services import document_processor, rag_retriever, llm_engine, validator, complaint_service
 from .services.validator import VALIDATION_MODEL_NAME
 import logging
 import re
@@ -540,22 +541,22 @@ class AuditQuestionGeneratorView(views.APIView):
                     start_json = first_brace
                 elif first_bracket != -1:
                     start_json = first_bracket
-                
+
                 if start_json != -1:
                     last_brace = cleaned_json_text.rfind('}')
                     last_bracket = cleaned_json_text.rfind(']')
-                    
+
                     if last_brace != -1 and last_bracket != -1:
                         end_json = max(last_brace, last_bracket)
                     elif last_brace != -1:
                         end_json = last_brace
                     elif last_bracket != -1:
                         end_json = last_bracket
-                    
+
                     if end_json != -1 and end_json >= start_json:
                         cleaned_json_text = cleaned_json_text[start_json : end_json+1]
                     else: # Fallback if sensible end not found
-                        cleaned_json_text = cleaned_json_text.strip() 
+                        cleaned_json_text = cleaned_json_text.strip()
                 else: # Fallback if sensible start not found
                     cleaned_json_text = cleaned_json_text.strip()
             # --- END SOLUTION ---
@@ -652,4 +653,90 @@ class AuditQuestionDeleteView(views.APIView):
             return Response({"error": "Audit question not found"}, status=status.HTTP_404_NOT_FOUND)
 
         question.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class ComplaintView(views.APIView):
+    """
+    API endpoint for managing complaints.
+    """
+    parser_classes = (MultiPartParser, FormParser)
+
+    def get(self, request, complaint_id=None, *args, **kwargs):
+        """
+        Get all complaints or a specific complaint by ID.
+        If complaint_id is provided, returns a single complaint.
+        Otherwise, returns a list of all complaints.
+        """
+        if complaint_id:
+            complaint, error = complaint_service.get_complaint_by_id(complaint_id)
+            if error:
+                status_code = status.HTTP_404_NOT_FOUND if "not found" in error else status.HTTP_500_INTERNAL_SERVER_ERROR
+                return Response({"error": error}, status=status_code)
+            serializer = ComplaintSerializer(complaint)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        else:
+            complaints, error = complaint_service.get_all_complaints()
+            if error:
+                return Response({"error": error}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            serializer = ComplaintSerializer(complaints, many=True)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+
+    def post(self, request, *args, **kwargs):
+        """
+        Create a new complaint.
+        """
+        # Handle file upload if present
+        file_obj = request.FILES.get('file_upload')
+        file_upload_path = None
+
+        if file_obj:
+            # Upload file to Supabase storage
+            file_upload_path, error = complaint_service.upload_complaint_file(file_obj, file_obj.name)
+            if error:
+                return Response({"error": f"File upload failed: {error}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        # Create serializer with request data
+        serializer = ComplaintSerializer(data=request.data)
+        if serializer.is_valid():
+            # Save complaint with file path if uploaded
+            complaint = serializer.save(file_upload_path=file_upload_path)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    def patch(self, request, complaint_id, *args, **kwargs):
+        """
+        Update an existing complaint.
+        """
+        try:
+            complaint = Complaint.objects.get(id=complaint_id)
+        except Complaint.DoesNotExist:
+            return Response({"error": "Complaint not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        # Handle file upload if present
+        file_obj = request.FILES.get('file_upload')
+        if file_obj:
+            # Upload new file to Supabase storage
+            file_upload_path, error = complaint_service.upload_complaint_file(file_obj, file_obj.name)
+            if error:
+                return Response({"error": f"File upload failed: {error}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+            # Update file path in request data
+            request.data['file_upload_path'] = file_upload_path
+
+        # Update complaint with request data
+        serializer = ComplaintSerializer(complaint, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    def delete(self, request, complaint_id, *args, **kwargs):
+        """
+        Delete a complaint by ID, including its file in storage.
+        """
+        success, error = complaint_service.delete_complaint(complaint_id)
+        if error:
+            status_code = status.HTTP_404_NOT_FOUND if "not found" in error else status.HTTP_500_INTERNAL_SERVER_ERROR
+            return Response({"error": error}, status=status_code)
         return Response(status=status.HTTP_204_NO_CONTENT)

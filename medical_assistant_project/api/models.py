@@ -94,3 +94,49 @@ class AuditQuestion(models.Model):
 
     def __str__(self):
         return f"Audit question for {self.policy_name}"
+
+
+class Complaint(models.Model):
+    """
+    Model for storing patient complaints and related information.
+    """
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    title = models.CharField(max_length=255)
+    reference_number = models.CharField(max_length=100, null=True, blank=True)
+    practice = models.CharField(max_length=255, null=True, blank=True)
+    form_date = models.DateField(null=True, blank=True)
+    reporter_name = models.CharField(max_length=255, null=True, blank=True, verbose_name='Person Completing the Report')
+    group = models.CharField(max_length=255, null=True, blank=True)
+    email = models.EmailField(null=True, blank=True)
+    patient_name = models.CharField(max_length=255, null=True, blank=True)
+    patient_nhi = models.CharField(max_length=100, null=True, blank=True, verbose_name='Patient NHI')
+    patient_dob = models.DateField(null=True, blank=True, verbose_name='Patient DOB')
+    patient_email = models.EmailField(null=True, blank=True)
+    patient_phone = models.CharField(max_length=50, null=True, blank=True, verbose_name='Patient Phone Number')
+    is_acknowledged = models.BooleanField(default=False, verbose_name="Has the patient's complaint been acknowledged?")
+    received_date = models.DateField(null=True, blank=True, verbose_name='Date Complaint was Received')
+    complaint_method = models.CharField(max_length=100, null=True, blank=True)
+    complaint_severity = models.CharField(max_length=100, null=True, blank=True)
+    complaint_owner = models.CharField(max_length=255, null=True, blank=True)
+    complaint_details = models.TextField(null=True, blank=True)
+    action_taken = models.TextField(null=True, blank=True, verbose_name='Action Taken at the Time of Complaint and By Whom')
+    is_notified_external = models.BooleanField(default=False, verbose_name='Was the complaint notified to an external organisation?')
+    other_comments = models.TextField(null=True, blank=True, verbose_name='Any Other Comments')
+    file_upload_path = models.CharField(max_length=1024, null=True, blank=True)
+    request_review_by = models.CharField(max_length=255, null=True, blank=True)
+    complaint_reason = models.TextField(null=True, blank=True, verbose_name='Reason for the Patient Complaint')
+    is_resolved = models.BooleanField(default=False, verbose_name='Was the Complaint Successfully Resolved?')
+    identified_issues = models.TextField(null=True, blank=True, verbose_name='Identified Issues as a Result of the Complaint')
+    staff_skill_issues = models.TextField(null=True, blank=True, verbose_name='Issues Related to Staff Skill or Knowledge')
+    policy_impact = models.TextField(null=True, blank=True, verbose_name='Did Practice Policies/Protocols Help or Hinder?')
+    is_disclosure_required = models.BooleanField(default=False, verbose_name='Is Open Disclosure Required?')
+    is_followup_required = models.BooleanField(default=False, verbose_name='Is Follow-Up Action Required?')
+    is_event_analysis_required = models.BooleanField(default=False, verbose_name='Is Formal Significant Event Analysis Required?')
+    is_training_required = models.BooleanField(default=False, verbose_name='Is Staff Training Required?')
+    is_visible_to_users = models.BooleanField(default=True, verbose_name='Make Complaint Management Visible to Users')
+    disable_editing = models.BooleanField(default=False, verbose_name='Disable Editing by Users')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"Complaint: {self.title}"
