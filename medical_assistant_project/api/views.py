@@ -540,22 +540,22 @@ class AuditQuestionGeneratorView(views.APIView):
                     start_json = first_brace
                 elif first_bracket != -1:
                     start_json = first_bracket
-                
+
                 if start_json != -1:
                     last_brace = cleaned_json_text.rfind('}')
                     last_bracket = cleaned_json_text.rfind(']')
-                    
+
                     if last_brace != -1 and last_bracket != -1:
                         end_json = max(last_brace, last_bracket)
                     elif last_brace != -1:
                         end_json = last_brace
                     elif last_bracket != -1:
                         end_json = last_bracket
-                    
+
                     if end_json != -1 and end_json >= start_json:
                         cleaned_json_text = cleaned_json_text[start_json : end_json+1]
                     else: # Fallback if sensible end not found
-                        cleaned_json_text = cleaned_json_text.strip() 
+                        cleaned_json_text = cleaned_json_text.strip()
                 else: # Fallback if sensible start not found
                     cleaned_json_text = cleaned_json_text.strip()
             # --- END SOLUTION ---
@@ -653,3 +653,23 @@ class AuditQuestionDeleteView(views.APIView):
 
         question.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+class AuditQuestionListView(views.APIView):
+    """
+    API endpoint for listing all audit questions.
+    """
+    def get(self, request, *args, **kwargs):
+        """
+        Get all audit questions with optional filtering by policy_name.
+        """
+        policy_name = request.query_params.get('policy_name')
+
+        # Start with all questions
+        queryset = AuditQuestion.objects.all().order_by('-created_at')
+
+        # Filter by policy_name if provided
+        if policy_name:
+            queryset = queryset.filter(policy_name__icontains=policy_name)
+
+        serializer = AuditQuestionSerializer(queryset, many=True)
+        return Response(serializer.data)
