@@ -23,9 +23,9 @@ from .serializers import (
     FeedbackMethodSerializer,
     FeedbackSerializer,
     FeedbackListSerializer,
-    FeedbackAttachmentSerializer
+    FeedbackAttachmentSerializer,
     AuditQuestionGenerationRequestSerializer,
-    ComplaintSerializer
+    ComplaintSerializer,
 )
 from .services import document_processor, rag_retriever, llm_engine, validator, feedback_processor, complaint_service
 from .services.validator import VALIDATION_MODEL_NAME

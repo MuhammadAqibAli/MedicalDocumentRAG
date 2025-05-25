@@ -13,9 +13,8 @@ from .views import (
     AuditQuestionGeneratorView,
     AuditQuestionUpdateView,
     AuditQuestionDeleteView,
-    ComplaintView
-    AuditQuestionDeleteView,
     AuditQuestionListView,
+    ComplaintView,
     PracticeViewSet,
     FeedbackMethodViewSet,
     FeedbackViewSet,
