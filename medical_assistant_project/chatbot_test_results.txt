@@ -1,0 +1,44 @@
+Chatbot Test Results - 2025-05-26 20:42:21
+============================================================
+
+[2025-05-26 20:42:21] ✅ PASS Import ChatbotEngine
+==================================================
+[2025-05-26 20:42:23] ✅ PASS Database Models - Found 8 intents, 5 responses, 6 actions
+Data: {
+  "intents": 8,
+  "responses": 5,
+  "quick_actions": 6
+}
+==================================================
+[2025-05-26 20:42:40] ✅ PASS Import API Views - All chatbot views imported successfully
+==================================================
+[2025-05-26 20:42:40] ✅ PASS Serializers - Message request serializer validation
+Data: {
+  "input_data": {
+    "message": "Hello, I want to register a complaint"
+  },
+  "is_valid": true,
+  "errors": null
+}
+==================================================
+[2025-05-26 20:42:43] ✅ PASS ChatbotEngine Process Message - Message processed successfully
+Data: {
+  "input": "Hello",
+  "response_type": "menu",
+  "intent_detected": "general_inquiry",
+  "confidence_score": 0.3
+}
+==================================================
+[2025-05-26 20:42:43] ✅ PASS ChatbotEngine Quick Actions - Retrieved 3 quick actions
+Data: {
+  "count": 3,
+  "actions": [
+    "Register Complaint",
+    "Check Status",
+    "Submit Feedback"
+  ]
+}
+==================================================
+[2025-05-26 20:42:43] ✅ PASS FINAL SUMMARY - 
+TEST SUMMARY: 5/5 tests passed 🎉 ALL TESTS PASSED!
+==================================================

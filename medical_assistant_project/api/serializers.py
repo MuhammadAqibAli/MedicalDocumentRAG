@@ -1,9 +1,9 @@
 from rest_framework import serializers
 from .models import (
     Document, GeneratedContent, DocumentChunk, Standard, StandardType,
-    QuestionOption, AuditQuestion, Practice, FeedbackMethod, Feedback, FeedbackAttachment
+    QuestionOption, AuditQuestion, Practice, FeedbackMethod, Feedback, FeedbackAttachment,
+    Complaint, ChatbotIntent, ChatbotResponse, ChatbotConversation, ChatbotMessage, ChatbotQuickAction
 )
-from .models import Document, GeneratedContent, DocumentChunk, Standard, StandardType, QuestionOption, AuditQuestion, Complaint
 from .services.llm_engine import AVAILABLE_MODELS
 
 class DocumentSerializer(serializers.ModelSerializer):
@@ -145,3 +145,111 @@ class ComplaintSerializer(serializers.ModelSerializer):
             'is_visible_to_users', 'disable_editing', 'created_at', 'updated_at'
         ]
         read_only_fields = ['id', 'created_at', 'updated_at', 'file_upload_path']
+
+
+# Chatbot Serializers
+class ChatbotIntentSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ChatbotIntent
+        fields = [
+            'id', 'name', 'intent_type', 'description', 'keywords', 'patterns',
+            'is_active', 'requires_auth', 'api_endpoint', 'created_at', 'updated_at'
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at']
+
+
+class ChatbotResponseSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ChatbotResponse
+        fields = [
+            'id', 'intent', 'response_type', 'message', 'buttons', 'quick_replies',
+            'is_active', 'priority', 'created_at'
+        ]
+        read_only_fields = ['id', 'created_at']
+
+
+class ChatbotQuickActionSerializer(serializers.ModelSerializer):
+    intent_name = serializers.CharField(source='intent.name', read_only=True)
+    intent_type = serializers.CharField(source='intent.intent_type', read_only=True)
+
+    class Meta:
+        model = ChatbotQuickAction
+        fields = [
+            'id', 'title', 'description', 'intent', 'intent_name', 'intent_type',
+            'button_text', 'icon', 'order', 'is_active', 'requires_auth', 'created_at'
+        ]
+        read_only_fields = ['id', 'created_at']
+
+
+class ChatbotMessageSerializer(serializers.ModelSerializer):
+    intent_name = serializers.CharField(source='intent_detected.name', read_only=True, allow_null=True)
+
+    class Meta:
+        model = ChatbotMessage
+        fields = [
+            'id', 'conversation', 'message_type', 'content', 'intent_detected',
+            'intent_name', 'confidence_score', 'metadata', 'timestamp'
+        ]
+        read_only_fields = ['id', 'timestamp']
+
+
+class ChatbotConversationSerializer(serializers.ModelSerializer):
+    messages = ChatbotMessageSerializer(many=True, read_only=True)
+    current_intent_name = serializers.CharField(source='current_intent.name', read_only=True, allow_null=True)
+    user_name = serializers.CharField(source='user.get_full_name', read_only=True, allow_null=True)
+
+    class Meta:
+        model = ChatbotConversation
+        fields = [
+            'id', 'session_id', 'user', 'user_name', 'status', 'current_intent',
+            'current_intent_name', 'context', 'started_at', 'last_activity',
+            'completed_at', 'messages'
+        ]
+        read_only_fields = ['id', 'started_at', 'last_activity']
+
+
+class ChatbotConversationListSerializer(serializers.ModelSerializer):
+    current_intent_name = serializers.CharField(source='current_intent.name', read_only=True, allow_null=True)
+    user_name = serializers.CharField(source='user.get_full_name', read_only=True, allow_null=True)
+    message_count = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ChatbotConversation
+        fields = [
+            'id', 'session_id', 'user', 'user_name', 'status', 'current_intent',
+            'current_intent_name', 'started_at', 'last_activity', 'completed_at',
+            'message_count'
+        ]
+        read_only_fields = ['id', 'started_at', 'last_activity']
+
+    def get_message_count(self, obj):
+        return obj.messages.count()
+
+
+# Request/Response Serializers for Chatbot API
+class ChatbotMessageRequestSerializer(serializers.Serializer):
+    message = serializers.CharField(max_length=2000, required=True)
+    session_id = serializers.CharField(max_length=255, required=False)
+    user_context = serializers.JSONField(required=False, default=dict)
+
+
+class ChatbotIntentDetectionSerializer(serializers.Serializer):
+    message = serializers.CharField(max_length=2000, required=True)
+
+
+class ChatbotActionRequestSerializer(serializers.Serializer):
+    intent_type = serializers.CharField(max_length=50, required=True)
+    session_id = serializers.CharField(max_length=255, required=True)
+    parameters = serializers.JSONField(required=False, default=dict)
+
+
+class ChatbotResponseDataSerializer(serializers.Serializer):
+    message = serializers.CharField()
+    response_type = serializers.CharField()
+    buttons = serializers.ListField(child=serializers.DictField(), required=False, default=list)
+    quick_replies = serializers.ListField(child=serializers.CharField(), required=False, default=list)
+    intent_detected = serializers.CharField(required=False, allow_null=True)
+    confidence_score = serializers.FloatField(required=False, allow_null=True)
+    session_id = serializers.CharField()
+    conversation_id = serializers.UUIDField(required=False, allow_null=True)
+    metadata = serializers.JSONField(required=False, default=dict)

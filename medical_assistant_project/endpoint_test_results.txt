@@ -1,0 +1,35 @@
+Chatbot Endpoint Test Results - 2025-05-26 20:45:32
+============================================================
+
+[2025-05-26 20:45:39] ❌ FAIL Health Endpoint - HTTPConnectionPool(host='localhost', port=8000): Read timed out. (read timeout=5)
+==================================================
+[2025-05-26 20:45:44] ✅ PASS Quick Actions - Found 3 actions
+Data: {
+  "count": 3,
+  "sample_actions": [
+    "Register Complaint",
+    "Check Status",
+    "Submit Feedback"
+  ]
+}
+==================================================
+[2025-05-26 20:45:49] ✅ PASS Message Processing - Message processed successfully
+Data: {
+  "input": "Hello, I want to register a complaint",
+  "intent_detected": "general_inquiry",
+  "confidence_score": 0.3,
+  "response_type": "menu",
+  "message_preview": "I'm here to help you with:\n\n\u2022 Registering complaints\n\u2022 Checking complaint status\n\u2022 Submitting feedba..."
+}
+==================================================
+[2025-05-26 20:45:53] ✅ PASS Intent Detection - Intent detected successfully
+Data: {
+  "input": "I need to check my complaint status",
+  "intent_type": "general_inquiry",
+  "confidence_score": 0.3,
+  "intent_name": "General Inquiry"
+}
+==================================================
+[2025-05-26 20:45:53] ❌ FAIL FINAL SUMMARY - 
+ENDPOINT TEST SUMMARY: 3/4 tests passed ⚠️  1 endpoints failed
+==================================================

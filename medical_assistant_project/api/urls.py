@@ -18,7 +18,14 @@ from .views import (
     PracticeViewSet,
     FeedbackMethodViewSet,
     FeedbackViewSet,
-    FeedbackAttachmentDownloadView
+    FeedbackAttachmentDownloadView,
+    ChatbotMessageView,
+    ChatbotIntentDetectionView,
+    ChatbotActionView,
+    ChatbotQuickActionsView,
+    ChatbotConversationViewSet,
+    ChatbotIntentViewSet,
+    ChatbotHealthView
 )
 
 router = DefaultRouter()
@@ -27,6 +34,8 @@ router.register(r'standard-types', StandardTypeViewSet, basename='standardtype')
 router.register(r'practices', PracticeViewSet, basename='practice')
 router.register(r'feedback-methods', FeedbackMethodViewSet, basename='feedbackmethod')
 router.register(r'feedback', FeedbackViewSet, basename='feedback')
+router.register(r'chatbot/conversations', ChatbotConversationViewSet, basename='chatbot-conversation')
+router.register(r'chatbot/intents', ChatbotIntentViewSet, basename='chatbot-intent')
 
 urlpatterns = [
     path('upload/', DocumentUploadView.as_view(), name='document-upload'),
@@ -54,4 +63,11 @@ urlpatterns = [
 
     # Feedback attachment download endpoint
     path('feedback-attachments/<uuid:attachment_id>/download/', FeedbackAttachmentDownloadView.as_view(), name='feedback-attachment-download'),
+
+    # Chatbot endpoints
+    path('chatbot/message/', ChatbotMessageView.as_view(), name='chatbot-message'),
+    path('chatbot/intent-detect/', ChatbotIntentDetectionView.as_view(), name='chatbot-intent-detect'),
+    path('chatbot/handle-intent/', ChatbotActionView.as_view(), name='chatbot-handle-intent'),
+    path('chatbot/quick-actions/', ChatbotQuickActionsView.as_view(), name='chatbot-quick-actions'),
+    path('chatbot/health/', ChatbotHealthView.as_view(), name='chatbot-health'),
 ]

@@ -240,3 +240,137 @@ class Complaint(models.Model):
 
     def __str__(self):
         return f"Complaint: {self.title}"
+
+
+# Chatbot Models
+class ChatbotIntent(models.Model):
+    """
+    Model for storing chatbot intents and their configurations.
+    """
+    INTENT_TYPES = [
+        ('complaint_register', 'Register Complaint'),
+        ('complaint_status', 'Check Complaint Status'),
+        ('feedback_submit', 'Submit Feedback'),
+        ('document_upload', 'Upload Document/Standard'),
+        ('content_generate', 'Generate Content'),
+        ('audit_questions', 'Create Audit Questions'),
+        ('general_inquiry', 'General Inquiry'),
+        ('greeting', 'Greeting'),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    name = models.CharField(max_length=100, unique=True)
+    intent_type = models.CharField(max_length=50, choices=INTENT_TYPES)
+    description = models.TextField()
+    keywords = models.JSONField(default=list, help_text="Keywords that trigger this intent")
+    patterns = models.JSONField(default=list, help_text="Regex patterns for intent detection")
+    is_active = models.BooleanField(default=True)
+    requires_auth = models.BooleanField(default=False)
+    api_endpoint = models.CharField(max_length=255, null=True, blank=True, help_text="Associated API endpoint")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"{self.name} ({self.intent_type})"
+
+
+class ChatbotResponse(models.Model):
+    """
+    Model for storing predefined chatbot responses.
+    """
+    RESPONSE_TYPES = [
+        ('greeting', 'Greeting'),
+        ('menu', 'Menu Options'),
+        ('confirmation', 'Confirmation'),
+        ('error', 'Error Message'),
+        ('help', 'Help Message'),
+        ('fallback', 'Fallback Response'),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    intent = models.ForeignKey(ChatbotIntent, on_delete=models.CASCADE, related_name='responses', null=True, blank=True)
+    response_type = models.CharField(max_length=50, choices=RESPONSE_TYPES)
+    message = models.TextField()
+    buttons = models.JSONField(default=list, help_text="Button options for the response")
+    quick_replies = models.JSONField(default=list, help_text="Quick reply options")
+    is_active = models.BooleanField(default=True)
+    priority = models.IntegerField(default=0, help_text="Higher priority responses are shown first")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-priority', 'created_at']
+
+    def __str__(self):
+        return f"{self.response_type} - {self.message[:50]}..."
+
+
+class ChatbotConversation(models.Model):
+    """
+    Model for storing chatbot conversation sessions.
+    """
+    STATUS_CHOICES = [
+        ('active', 'Active'),
+        ('completed', 'Completed'),
+        ('abandoned', 'Abandoned'),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    session_id = models.CharField(max_length=255, unique=True)
+    user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='active')
+    current_intent = models.ForeignKey(ChatbotIntent, on_delete=models.SET_NULL, null=True, blank=True)
+    context = models.JSONField(default=dict, help_text="Conversation context and state")
+    started_at = models.DateTimeField(auto_now_add=True)
+    last_activity = models.DateTimeField(auto_now=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+
+    def __str__(self):
+        return f"Conversation {self.session_id} - {self.status}"
+
+
+class ChatbotMessage(models.Model):
+    """
+    Model for storing individual messages in chatbot conversations.
+    """
+    MESSAGE_TYPES = [
+        ('user', 'User Message'),
+        ('bot', 'Bot Response'),
+        ('system', 'System Message'),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    conversation = models.ForeignKey(ChatbotConversation, on_delete=models.CASCADE, related_name='messages')
+    message_type = models.CharField(max_length=20, choices=MESSAGE_TYPES)
+    content = models.TextField()
+    intent_detected = models.ForeignKey(ChatbotIntent, on_delete=models.SET_NULL, null=True, blank=True)
+    confidence_score = models.FloatField(null=True, blank=True)
+    metadata = models.JSONField(default=dict, help_text="Additional message metadata")
+    timestamp = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['timestamp']
+
+    def __str__(self):
+        return f"{self.message_type} - {self.content[:50]}..."
+
+
+class ChatbotQuickAction(models.Model):
+    """
+    Model for storing quick action buttons and their configurations.
+    """
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    title = models.CharField(max_length=100)
+    description = models.TextField(null=True, blank=True)
+    intent = models.ForeignKey(ChatbotIntent, on_delete=models.CASCADE, related_name='quick_actions')
+    button_text = models.CharField(max_length=50)
+    icon = models.CharField(max_length=50, null=True, blank=True, help_text="Icon class or name")
+    order = models.IntegerField(default=0)
+    is_active = models.BooleanField(default=True)
+    requires_auth = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['order', 'title']
+
+    def __str__(self):
+        return f"{self.title} - {self.button_text}"
