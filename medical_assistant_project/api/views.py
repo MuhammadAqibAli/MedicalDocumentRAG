@@ -922,19 +922,6 @@ class UserListView(views.APIView):
             return Response({"error": error}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         return Response(users, status=status.HTTP_200_OK)
 
-class UserListView(views.APIView):
-    """
-    API endpoint for listing all users from Supabase auth.
-    """
-    def get(self, request, *args, **kwargs):
-        """
-        Get all users from Supabase auth.users table.
-        """
-        users, error = user_service.get_all_users()
-        if error:
-            return Response({"error": error}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-        return Response(users, status=status.HTTP_200_OK)
-
 
 # Chatbot Views
 from django.utils.decorators import method_decorator
