@@ -36,6 +36,7 @@ from django.db.models import Q
 from django.utils import timezone
 from datetime import timedelta
 logger = logging.getLogger(__name__)
+from .services import user_service
 
 class ServiceUnavailable(APIException):
     status_code = 503
@@ -907,3 +908,16 @@ class ComplaintView(views.APIView):
             status_code = status.HTTP_404_NOT_FOUND if "not found" in error else status.HTTP_500_INTERNAL_SERVER_ERROR
             return Response({"error": error}, status=status_code)
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+class UserListView(views.APIView):
+    """
+    API endpoint for listing all users from Supabase auth.
+    """
+    def get(self, request, *args, **kwargs):
+        """
+        Get all users from Supabase auth.users table.
+        """
+        users, error = user_service.get_all_users()
+        if error:
+            return Response({"error": error}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return Response(users, status=status.HTTP_200_OK)

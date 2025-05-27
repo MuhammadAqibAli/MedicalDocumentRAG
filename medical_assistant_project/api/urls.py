@@ -18,7 +18,8 @@ from .views import (
     PracticeViewSet,
     FeedbackMethodViewSet,
     FeedbackViewSet,
-    FeedbackAttachmentDownloadView
+    FeedbackAttachmentDownloadView,
+    UserListView
 )
 
 router = DefaultRouter()
@@ -54,4 +55,7 @@ urlpatterns = [
 
     # Feedback attachment download endpoint
     path('feedback-attachments/<uuid:attachment_id>/download/', FeedbackAttachmentDownloadView.as_view(), name='feedback-attachment-download'),
+
+    # User management endpoint
+    path('users/', UserListView.as_view(), name='user-list'),
 ]
