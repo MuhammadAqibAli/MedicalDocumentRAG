@@ -921,3 +921,390 @@ class UserListView(views.APIView):
         if error:
             return Response({"error": error}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         return Response(users, status=status.HTTP_200_OK)
+
+class UserListView(views.APIView):
+    """
+    API endpoint for listing all users from Supabase auth.
+    """
+    def get(self, request, *args, **kwargs):
+        """
+        Get all users from Supabase auth.users table.
+        """
+        users, error = user_service.get_all_users()
+        if error:
+            return Response({"error": error}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return Response(users, status=status.HTTP_200_OK)
+
+
+# Chatbot Views
+from django.utils.decorators import method_decorator
+from django.views.decorators.csrf import csrf_exempt
+from django.contrib.auth.models import User
+from django.utils import timezone
+from rest_framework.parsers import JSONParser
+from .models import (
+    ChatbotIntent, ChatbotResponse, ChatbotConversation, ChatbotMessage,
+    ChatbotQuickAction
+)
+from .serializers import (
+    ChatbotIntentSerializer, ChatbotResponseSerializer, ChatbotConversationSerializer,
+    ChatbotConversationListSerializer, ChatbotMessageSerializer, ChatbotQuickActionSerializer,
+    ChatbotMessageRequestSerializer, ChatbotIntentDetectionSerializer,
+    ChatbotActionRequestSerializer, ChatbotResponseDataSerializer
+)
+from .services.chatbot_engine import ChatbotEngine
+
+
+@method_decorator(csrf_exempt, name='dispatch')
+class ChatbotMessageView(views.APIView):
+    """
+    Main chatbot endpoint for processing user messages.
+    """
+    parser_classes = [JSONParser]
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self._chatbot_engine = None
+
+    @property
+    def chatbot_engine(self):
+        if self._chatbot_engine is None:
+            self._chatbot_engine = ChatbotEngine()
+        return self._chatbot_engine
+
+    def post(self, request, *args, **kwargs):
+        """
+        Process user message and return chatbot response.
+        """
+        try:
+            import json
+
+            # Parse JSON data from request body
+            if hasattr(request, 'data'):
+                # DRF request
+                request_data = request.data
+            else:
+                # Standard Django request
+                request_data = json.loads(request.body.decode('utf-8'))
+
+            serializer = ChatbotMessageRequestSerializer(data=request_data)
+            if not serializer.is_valid():
+                return Response({
+                    'error': 'Invalid request data',
+                    'details': serializer.errors
+                }, status=status.HTTP_400_BAD_REQUEST)
+
+            validated_data = serializer.validated_data
+            message = validated_data['message']
+            session_id = validated_data.get('session_id')
+            user_context = validated_data.get('user_context', {})
+
+            # Get user if authenticated
+            user = None
+            if hasattr(request, 'user') and request.user and request.user.is_authenticated:
+                user = request.user
+            elif user_context.get('user_id'):
+                try:
+                    user = User.objects.get(id=user_context['user_id'])
+                except User.DoesNotExist:
+                    pass
+
+            # Process message through chatbot engine
+            response_data = self.chatbot_engine.process_message(
+                message=message,
+                session_id=session_id,
+                user=user,
+                context=user_context
+            )
+
+            # Serialize response
+            response_serializer = ChatbotResponseDataSerializer(data=response_data)
+            if response_serializer.is_valid():
+                return Response(response_serializer.data, status=status.HTTP_200_OK)
+            else:
+                # Return raw response if serialization fails
+                return Response(response_data, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            logger.error(f"Error in ChatbotMessageView: {e}")
+            return Response({
+                'error': 'An unexpected error occurred',
+                'message': 'I apologize, but I encountered an error. Please try again.',
+                'response_type': 'error'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class ChatbotIntentDetectionView(views.APIView):
+    """
+    Endpoint for detecting intent from user message without processing.
+    """
+    parser_classes = [JSONParser]
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self._chatbot_engine = None
+
+    @property
+    def chatbot_engine(self):
+        if self._chatbot_engine is None:
+            self._chatbot_engine = ChatbotEngine()
+        return self._chatbot_engine
+
+    def post(self, request, *args, **kwargs):
+        """
+        Detect intent from user message.
+        """
+        try:
+            import json
+
+            # Parse JSON data from request body
+            if hasattr(request, 'data'):
+                # DRF request
+                request_data = request.data
+            else:
+                # Standard Django request
+                request_data = json.loads(request.body.decode('utf-8'))
+
+            serializer = ChatbotIntentDetectionSerializer(data=request_data)
+            if not serializer.is_valid():
+                return Response({
+                    'error': 'Invalid request data',
+                    'details': serializer.errors
+                }, status=status.HTTP_400_BAD_REQUEST)
+
+            message = serializer.validated_data['message']
+
+            # Detect intent
+            intent_type, confidence = self.chatbot_engine.intent_detector.detect_intent(message)
+
+            # Get intent details
+            intent = ChatbotIntent.objects.filter(intent_type=intent_type, is_active=True).first()
+
+            return Response({
+                'intent_type': intent_type,
+                'confidence_score': confidence,
+                'intent_name': intent.name if intent else None,
+                'intent_description': intent.description if intent else None,
+                'api_endpoint': intent.api_endpoint if intent else None
+            }, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            logger.error(f"Error in ChatbotIntentDetectionView: {e}")
+            return Response({
+                'error': 'An unexpected error occurred during intent detection'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class ChatbotActionView(views.APIView):
+    """
+    Endpoint for executing specific actions based on intent.
+    """
+    parser_classes = [JSONParser]
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self._chatbot_engine = None
+
+    @property
+    def chatbot_engine(self):
+        if self._chatbot_engine is None:
+            self._chatbot_engine = ChatbotEngine()
+        return self._chatbot_engine
+
+    def post(self, request, *args, **kwargs):
+        """
+        Execute action for specific intent.
+        """
+        try:
+            import json
+
+            # Parse JSON data from request body
+            if hasattr(request, 'data'):
+                # DRF request
+                request_data = request.data
+            else:
+                # Standard Django request
+                request_data = json.loads(request.body.decode('utf-8'))
+
+            serializer = ChatbotActionRequestSerializer(data=request_data)
+            if not serializer.is_valid():
+                return Response({
+                    'error': 'Invalid request data',
+                    'details': serializer.errors
+                }, status=status.HTTP_400_BAD_REQUEST)
+
+            validated_data = serializer.validated_data
+            intent_type = validated_data['intent_type']
+            session_id = validated_data['session_id']
+            parameters = validated_data.get('parameters', {})
+
+            # Get user if authenticated
+            user = None
+            if hasattr(request, 'user') and request.user and request.user.is_authenticated:
+                user = request.user
+
+            # Execute action
+            response_data = self.chatbot_engine.action_dispatcher.dispatch_action(
+                intent_type=intent_type,
+                message=f"Action triggered: {intent_type}",
+                session_id=session_id,
+                user=user,
+                parameters=parameters
+            )
+
+            return Response(response_data, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            logger.error(f"Error in ChatbotActionView: {e}")
+            return Response({
+                'error': 'An unexpected error occurred during action execution'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class ChatbotQuickActionsView(views.APIView):
+    """
+    Endpoint for getting available quick actions.
+    """
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self._chatbot_engine = None
+
+    @property
+    def chatbot_engine(self):
+        if self._chatbot_engine is None:
+            self._chatbot_engine = ChatbotEngine()
+        return self._chatbot_engine
+
+    def get(self, request, *args, **kwargs):
+        """
+        Get available quick actions for the user.
+        """
+        try:
+            user = None
+            if hasattr(request, 'user') and request.user and request.user.is_authenticated:
+                user = request.user
+
+            quick_actions = self.chatbot_engine.get_quick_actions(user)
+
+            return Response({
+                'quick_actions': quick_actions,
+                'count': len(quick_actions)
+            }, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            logger.error(f"Error in ChatbotQuickActionsView: {e}")
+            return Response({
+                'error': 'An unexpected error occurred while fetching quick actions'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class ChatbotConversationViewSet(viewsets.ReadOnlyModelViewSet):
+    """
+    ViewSet for managing chatbot conversations.
+    """
+    queryset = ChatbotConversation.objects.all().order_by('-last_activity')
+
+    def get_serializer_class(self):
+        if self.action == 'list':
+            return ChatbotConversationListSerializer
+        return ChatbotConversationSerializer
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+
+        # Filter by user if authenticated
+        if self.request.user and self.request.user.is_authenticated:
+            queryset = queryset.filter(user=self.request.user)
+
+        # Filter by session_id if provided
+        session_id = self.request.query_params.get('session_id')
+        if session_id:
+            queryset = queryset.filter(session_id=session_id)
+
+        # Filter by status
+        status_filter = self.request.query_params.get('status')
+        if status_filter:
+            queryset = queryset.filter(status=status_filter)
+
+        return queryset
+
+    @action(detail=True, methods=['post'])
+    def complete(self, request, pk=None):
+        """Mark conversation as completed."""
+        try:
+            conversation = self.get_object()
+            conversation.status = 'completed'
+            conversation.completed_at = timezone.now()
+            conversation.save()
+
+            serializer = self.get_serializer(conversation)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            logger.error(f"Error completing conversation: {e}")
+            return Response({
+                'error': 'Failed to complete conversation'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class ChatbotIntentViewSet(viewsets.ReadOnlyModelViewSet):
+    """
+    ViewSet for managing chatbot intents (admin/configuration).
+    """
+    queryset = ChatbotIntent.objects.filter(is_active=True).order_by('intent_type')
+    serializer_class = ChatbotIntentSerializer
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+
+        # Filter by intent type
+        intent_type = self.request.query_params.get('intent_type')
+        if intent_type:
+            queryset = queryset.filter(intent_type=intent_type)
+
+        # Filter by requires_auth
+        requires_auth = self.request.query_params.get('requires_auth')
+        if requires_auth is not None:
+            requires_auth_bool = requires_auth.lower() in ['true', '1', 'yes']
+            queryset = queryset.filter(requires_auth=requires_auth_bool)
+
+        return queryset
+
+
+class ChatbotHealthView(views.APIView):
+    """
+    Health check endpoint for the chatbot service.
+    """
+
+    def get(self, request, *args, **kwargs):
+        """
+        Check if the chatbot service is healthy.
+        """
+        try:
+            # Check if intents are loaded
+            intent_count = ChatbotIntent.objects.filter(is_active=True).count()
+
+            # Check if responses are available
+            response_count = ChatbotResponse.objects.filter(is_active=True).count()
+
+            # Check if quick actions are available
+            quick_action_count = ChatbotQuickAction.objects.filter(is_active=True).count()
+
+            return Response({
+                'status': 'healthy',
+                'service': 'chatbot',
+                'version': '1.0.0',
+                'statistics': {
+                    'active_intents': intent_count,
+                    'active_responses': response_count,
+                    'active_quick_actions': quick_action_count
+                }
+            }, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            logger.error(f"Error in ChatbotHealthView: {e}")
+            return Response({
+                'status': 'unhealthy',
+                'error': str(e)
+            }, status=status.HTTP_503_SERVICE_UNAVAILABLE)

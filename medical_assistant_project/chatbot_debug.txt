@@ -1,0 +1,37 @@
+Chatbot Debug Session - 2025-05-26 21:59:33
+============================================================
+
+[2025-05-26 21:59:33] Starting chatbot debug session...
+==================================================
+[2025-05-26 21:59:33] Running test: Database Connection
+==================================================
+[2025-05-26 21:59:36] ✅ Database connection: Found 8 intents
+==================================================
+[2025-05-26 21:59:36] Running test: Serializers
+==================================================
+[2025-05-26 21:59:55] ✅ Serializer test: Valid=True, Errors={}
+==================================================
+[2025-05-26 21:59:55] Running test: ChatbotEngine
+==================================================
+[2025-05-26 21:59:55] ✅ ChatbotEngine imported successfully
+==================================================
+[2025-05-26 21:59:56] ✅ ChatbotEngine instantiated successfully
+==================================================
+[2025-05-26 21:59:57] ✅ Message processed successfully
+Error: {'message': "I'm here to help you with:\n\n• Registering complaints\n• Checking complaint status\n• Submitting feedback\n• Uploading documents\n• Generating content\n• Creating audit questions\n\nWhat would you like to do?", 'response_type': 'menu', 'buttons': [{'text': 'Register Complaint', 'value': 'complaint_register', 'action': 'intent'}, {'text': 'Check Status', 'value': 'complaint_status', 'action': 'intent'}, {'text': 'Submit Feedback', 'value': 'feedback_submit', 'action': 'intent'}, {'text': 'Upload Document', 'value': 'document_upload', 'action': 'intent'}, {'text': 'Generate Content', 'value': 'content_generate', 'action': 'intent'}, {'text': 'Audit Questions', 'value': 'audit_questions', 'action': 'intent'}], 'quick_replies': ['Complaint', 'Feedback', 'Upload', 'Generate'], 'session_id': 'test-session', 'conversation_id': 'a1d0714e-990b-4a4b-b282-3b20d6c9ee48', 'intent_detected': 'general_inquiry', 'confidence_score': 0.3}
+Traceback:
+NoneType: None
+
+==================================================
+[2025-05-26 21:59:57] Running test: ChatbotView
+==================================================
+[2025-05-26 21:59:59] ✅ ChatbotMessageView imported successfully
+==================================================
+[2025-05-26 21:59:59] ✅ Test request created
+==================================================
+[2025-05-26 21:59:59] ✅ View instantiated
+==================================================
+[2025-05-26 22:00:01] ✅ View response: Status 200
+==================================================
+[2025-05-26 22:00:01] DEBUG SUMMARY: 4/4 tests passed 🎉 All tests passed - issue might be elsewhere
+==================================================
