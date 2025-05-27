@@ -170,6 +170,10 @@ if DATABASE_URL: # Only configure if DATABASE_URL is available
     # Ensure the engine is explicitly PostgreSQL, dj_database_url usually handles this
     if 'default' in DATABASES:
          DATABASES['default']['ENGINE'] = 'django.db.backends.postgresql'
+         # Add connection pooling options to prevent max connections error
+         DATABASES['default']['OPTIONS'] = {
+             'connect_timeout': 10,
+         }
 else:
     # Handle the case where DATABASE_URL is not set, perhaps by setting up a dummy
     # database config or raising an error earlier. For now, DATABASES will be empty.

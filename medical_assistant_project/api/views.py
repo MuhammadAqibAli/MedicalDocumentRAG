@@ -764,8 +764,28 @@ class FeedbackViewSet(viewsets.ModelViewSet):
 
         # Return the created feedback with updated serializer that includes attachments
         serializer = self.get_serializer(feedback)
-        headers = self.get_success_headers(serializer.data)
-        return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+
+        # Enhanced response for chatbot integration
+        response_data = serializer.data
+        response_data['chatbot_context'] = {
+            'confirmation_message': f"Thank you for your feedback! Your submission has been recorded with reference number {feedback.reference_number}",
+            'reference_number': feedback.reference_number,
+            'next_steps': [
+                "Your feedback has been successfully submitted",
+                f"Reference: {feedback.reference_number}",
+                "Management will review your feedback within 1-2 business days",
+                "You may receive a follow-up if additional information is needed"
+            ],
+            'quick_actions': [
+                {'text': 'Submit Another Feedback', 'value': 'feedback_submit'},
+                {'text': 'Register Complaint', 'value': 'complaint_register'},
+                {'text': 'Upload Documents', 'value': 'document_upload'},
+                {'text': 'Main Menu', 'value': 'general_inquiry'}
+            ]
+        }
+
+        headers = self.get_success_headers(response_data)
+        return Response(response_data, status=status.HTTP_201_CREATED, headers=headers)
 
     @action(detail=True, methods=['post'])
     def add_attachment(self, request, pk=None):
@@ -869,7 +889,27 @@ class ComplaintView(views.APIView):
         if serializer.is_valid():
             # Save complaint with file path if uploaded
             complaint = serializer.save(file_upload_path=file_upload_path)
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+            # Enhanced response for chatbot integration
+            response_data = serializer.data
+            response_data['chatbot_context'] = {
+                'confirmation_message': f"Your complaint has been successfully registered with reference number {complaint.reference_number}",
+                'reference_number': complaint.reference_number,
+                'next_steps': [
+                    "Your complaint has been registered and assigned a reference number",
+                    f"Reference: {complaint.reference_number}",
+                    "Expected response time: 2-3 business days",
+                    "You will be contacted by our team for any additional information"
+                ],
+                'quick_actions': [
+                    {'text': 'Check Status', 'value': 'complaint_status', 'reference': complaint.reference_number},
+                    {'text': 'Add Documents', 'value': 'upload_documents', 'complaint_id': str(complaint.id)},
+                    {'text': 'Submit Feedback', 'value': 'feedback_submit'},
+                    {'text': 'Main Menu', 'value': 'general_inquiry'}
+                ]
+            }
+
+            return Response(response_data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     def patch(self, request, complaint_id, *args, **kwargs):
@@ -923,41 +963,37 @@ class UserListView(views.APIView):
         return Response(users, status=status.HTTP_200_OK)
 
 
-# Chatbot Views
+# Simple Chatbot Views
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
 from django.contrib.auth.models import User
 from django.utils import timezone
 from rest_framework.parsers import JSONParser
-from .models import (
-    ChatbotIntent, ChatbotResponse, ChatbotConversation, ChatbotMessage,
-    ChatbotQuickAction
-)
+from .models import SimpleChatbotConversation, SimpleChatbotMessage
 from .serializers import (
-    ChatbotIntentSerializer, ChatbotResponseSerializer, ChatbotConversationSerializer,
-    ChatbotConversationListSerializer, ChatbotMessageSerializer, ChatbotQuickActionSerializer,
-    ChatbotMessageRequestSerializer, ChatbotIntentDetectionSerializer,
-    ChatbotActionRequestSerializer, ChatbotResponseDataSerializer
+    SimpleChatbotConversationSerializer, SimpleChatbotMessageSerializer,
+    SimpleChatbotMessageRequestSerializer, SimpleChatbotResponseSerializer
 )
-from .services.chatbot_engine import ChatbotEngine
+from .services.simple_chatbot import SimpleChatbotService
 
 
 @method_decorator(csrf_exempt, name='dispatch')
-class ChatbotMessageView(views.APIView):
+class SimpleChatbotMessageView(views.APIView):
     """
-    Main chatbot endpoint for processing user messages.
+    Simple chatbot endpoint for processing user messages.
+    Supports: Complaint Registration, Status Check, and Feedback Submission
     """
     parser_classes = [JSONParser]
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self._chatbot_engine = None
+        self._chatbot_service = None
 
     @property
-    def chatbot_engine(self):
-        if self._chatbot_engine is None:
-            self._chatbot_engine = ChatbotEngine()
-        return self._chatbot_engine
+    def chatbot_service(self):
+        if self._chatbot_service is None:
+            self._chatbot_service = SimpleChatbotService()
+        return self._chatbot_service
 
     def post(self, request, *args, **kwargs):
         """
@@ -974,7 +1010,7 @@ class ChatbotMessageView(views.APIView):
                 # Standard Django request
                 request_data = json.loads(request.body.decode('utf-8'))
 
-            serializer = ChatbotMessageRequestSerializer(data=request_data)
+            serializer = SimpleChatbotMessageRequestSerializer(data=request_data)
             if not serializer.is_valid():
                 return Response({
                     'error': 'Invalid request data',
@@ -996,16 +1032,19 @@ class ChatbotMessageView(views.APIView):
                 except User.DoesNotExist:
                     pass
 
-            # Process message through chatbot engine
-            response_data = self.chatbot_engine.process_message(
+            # Process message through simple chatbot service
+            response_data = self.chatbot_service.process_message(
                 message=message,
                 session_id=session_id,
-                user=user,
-                context=user_context
+                user=user
             )
 
+            # Add session_id to response
+            if session_id:
+                response_data['session_id'] = session_id
+
             # Serialize response
-            response_serializer = ChatbotResponseDataSerializer(data=response_data)
+            response_serializer = SimpleChatbotResponseSerializer(data=response_data)
             if response_serializer.is_valid():
                 return Response(response_serializer.data, status=status.HTTP_200_OK)
             else:
@@ -1013,7 +1052,7 @@ class ChatbotMessageView(views.APIView):
                 return Response(response_data, status=status.HTTP_200_OK)
 
         except Exception as e:
-            logger.error(f"Error in ChatbotMessageView: {e}")
+            logger.error(f"Error in SimpleChatbotMessageView: {e}")
             return Response({
                 'error': 'An unexpected error occurred',
                 'message': 'I apologize, but I encountered an error. Please try again.',
@@ -1021,276 +1060,70 @@ class ChatbotMessageView(views.APIView):
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
-class ChatbotIntentDetectionView(views.APIView):
+class SimpleChatbotConversationView(views.APIView):
     """
-    Endpoint for detecting intent from user message without processing.
+    Endpoint for getting conversation history.
     """
-    parser_classes = [JSONParser]
 
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        self._chatbot_engine = None
-
-    @property
-    def chatbot_engine(self):
-        if self._chatbot_engine is None:
-            self._chatbot_engine = ChatbotEngine()
-        return self._chatbot_engine
-
-    def post(self, request, *args, **kwargs):
+    def get(self, request, session_id=None, *args, **kwargs):
         """
-        Detect intent from user message.
+        Get conversation history for a session.
         """
         try:
-            import json
+            if not session_id:
+                session_id = request.query_params.get('session_id')
 
-            # Parse JSON data from request body
-            if hasattr(request, 'data'):
-                # DRF request
-                request_data = request.data
-            else:
-                # Standard Django request
-                request_data = json.loads(request.body.decode('utf-8'))
-
-            serializer = ChatbotIntentDetectionSerializer(data=request_data)
-            if not serializer.is_valid():
+            if not session_id:
                 return Response({
-                    'error': 'Invalid request data',
-                    'details': serializer.errors
+                    'error': 'session_id is required'
                 }, status=status.HTTP_400_BAD_REQUEST)
 
-            message = serializer.validated_data['message']
+            chatbot_service = SimpleChatbotService()
+            conversation_data = chatbot_service.get_conversation_history(session_id)
 
-            # Detect intent
-            intent_type, confidence = self.chatbot_engine.intent_detector.detect_intent(message)
+            if 'error' in conversation_data:
+                return Response(conversation_data, status=status.HTTP_404_NOT_FOUND)
 
-            # Get intent details
-            intent = ChatbotIntent.objects.filter(intent_type=intent_type, is_active=True).first()
-
-            return Response({
-                'intent_type': intent_type,
-                'confidence_score': confidence,
-                'intent_name': intent.name if intent else None,
-                'intent_description': intent.description if intent else None,
-                'api_endpoint': intent.api_endpoint if intent else None
-            }, status=status.HTTP_200_OK)
+            return Response(conversation_data, status=status.HTTP_200_OK)
 
         except Exception as e:
-            logger.error(f"Error in ChatbotIntentDetectionView: {e}")
+            logger.error(f"Error in SimpleChatbotConversationView: {e}")
             return Response({
-                'error': 'An unexpected error occurred during intent detection'
+                'error': 'An unexpected error occurred'
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
-class ChatbotActionView(views.APIView):
+class SimpleChatbotHealthView(views.APIView):
     """
-    Endpoint for executing specific actions based on intent.
-    """
-    parser_classes = [JSONParser]
-
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        self._chatbot_engine = None
-
-    @property
-    def chatbot_engine(self):
-        if self._chatbot_engine is None:
-            self._chatbot_engine = ChatbotEngine()
-        return self._chatbot_engine
-
-    def post(self, request, *args, **kwargs):
-        """
-        Execute action for specific intent.
-        """
-        try:
-            import json
-
-            # Parse JSON data from request body
-            if hasattr(request, 'data'):
-                # DRF request
-                request_data = request.data
-            else:
-                # Standard Django request
-                request_data = json.loads(request.body.decode('utf-8'))
-
-            serializer = ChatbotActionRequestSerializer(data=request_data)
-            if not serializer.is_valid():
-                return Response({
-                    'error': 'Invalid request data',
-                    'details': serializer.errors
-                }, status=status.HTTP_400_BAD_REQUEST)
-
-            validated_data = serializer.validated_data
-            intent_type = validated_data['intent_type']
-            session_id = validated_data['session_id']
-            parameters = validated_data.get('parameters', {})
-
-            # Get user if authenticated
-            user = None
-            if hasattr(request, 'user') and request.user and request.user.is_authenticated:
-                user = request.user
-
-            # Execute action
-            response_data = self.chatbot_engine.action_dispatcher.dispatch_action(
-                intent_type=intent_type,
-                message=f"Action triggered: {intent_type}",
-                session_id=session_id,
-                user=user,
-                parameters=parameters
-            )
-
-            return Response(response_data, status=status.HTTP_200_OK)
-
-        except Exception as e:
-            logger.error(f"Error in ChatbotActionView: {e}")
-            return Response({
-                'error': 'An unexpected error occurred during action execution'
-            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-
-class ChatbotQuickActionsView(views.APIView):
-    """
-    Endpoint for getting available quick actions.
-    """
-
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        self._chatbot_engine = None
-
-    @property
-    def chatbot_engine(self):
-        if self._chatbot_engine is None:
-            self._chatbot_engine = ChatbotEngine()
-        return self._chatbot_engine
-
-    def get(self, request, *args, **kwargs):
-        """
-        Get available quick actions for the user.
-        """
-        try:
-            user = None
-            if hasattr(request, 'user') and request.user and request.user.is_authenticated:
-                user = request.user
-
-            quick_actions = self.chatbot_engine.get_quick_actions(user)
-
-            return Response({
-                'quick_actions': quick_actions,
-                'count': len(quick_actions)
-            }, status=status.HTTP_200_OK)
-
-        except Exception as e:
-            logger.error(f"Error in ChatbotQuickActionsView: {e}")
-            return Response({
-                'error': 'An unexpected error occurred while fetching quick actions'
-            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-
-class ChatbotConversationViewSet(viewsets.ReadOnlyModelViewSet):
-    """
-    ViewSet for managing chatbot conversations.
-    """
-    queryset = ChatbotConversation.objects.all().order_by('-last_activity')
-
-    def get_serializer_class(self):
-        if self.action == 'list':
-            return ChatbotConversationListSerializer
-        return ChatbotConversationSerializer
-
-    def get_queryset(self):
-        queryset = super().get_queryset()
-
-        # Filter by user if authenticated
-        if self.request.user and self.request.user.is_authenticated:
-            queryset = queryset.filter(user=self.request.user)
-
-        # Filter by session_id if provided
-        session_id = self.request.query_params.get('session_id')
-        if session_id:
-            queryset = queryset.filter(session_id=session_id)
-
-        # Filter by status
-        status_filter = self.request.query_params.get('status')
-        if status_filter:
-            queryset = queryset.filter(status=status_filter)
-
-        return queryset
-
-    @action(detail=True, methods=['post'])
-    def complete(self, request, pk=None):
-        """Mark conversation as completed."""
-        try:
-            conversation = self.get_object()
-            conversation.status = 'completed'
-            conversation.completed_at = timezone.now()
-            conversation.save()
-
-            serializer = self.get_serializer(conversation)
-            return Response(serializer.data, status=status.HTTP_200_OK)
-
-        except Exception as e:
-            logger.error(f"Error completing conversation: {e}")
-            return Response({
-                'error': 'Failed to complete conversation'
-            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-
-class ChatbotIntentViewSet(viewsets.ReadOnlyModelViewSet):
-    """
-    ViewSet for managing chatbot intents (admin/configuration).
-    """
-    queryset = ChatbotIntent.objects.filter(is_active=True).order_by('intent_type')
-    serializer_class = ChatbotIntentSerializer
-
-    def get_queryset(self):
-        queryset = super().get_queryset()
-
-        # Filter by intent type
-        intent_type = self.request.query_params.get('intent_type')
-        if intent_type:
-            queryset = queryset.filter(intent_type=intent_type)
-
-        # Filter by requires_auth
-        requires_auth = self.request.query_params.get('requires_auth')
-        if requires_auth is not None:
-            requires_auth_bool = requires_auth.lower() in ['true', '1', 'yes']
-            queryset = queryset.filter(requires_auth=requires_auth_bool)
-
-        return queryset
-
-
-class ChatbotHealthView(views.APIView):
-    """
-    Health check endpoint for the chatbot service.
+    Health check endpoint for the simple chatbot service.
     """
 
     def get(self, request, *args, **kwargs):
         """
-        Check if the chatbot service is healthy.
+        Check if the simple chatbot service is healthy.
         """
         try:
-            # Check if intents are loaded
-            intent_count = ChatbotIntent.objects.filter(is_active=True).count()
-
-            # Check if responses are available
-            response_count = ChatbotResponse.objects.filter(is_active=True).count()
-
-            # Check if quick actions are available
-            quick_action_count = ChatbotQuickAction.objects.filter(is_active=True).count()
+            # Check if conversation models are accessible
+            conversation_count = SimpleChatbotConversation.objects.count()
+            message_count = SimpleChatbotMessage.objects.count()
 
             return Response({
                 'status': 'healthy',
-                'service': 'chatbot',
+                'service': 'simple_chatbot',
                 'version': '1.0.0',
+                'features': [
+                    'complaint_registration',
+                    'complaint_status_check',
+                    'feedback_submission'
+                ],
                 'statistics': {
-                    'active_intents': intent_count,
-                    'active_responses': response_count,
-                    'active_quick_actions': quick_action_count
+                    'total_conversations': conversation_count,
+                    'total_messages': message_count
                 }
             }, status=status.HTTP_200_OK)
 
         except Exception as e:
-            logger.error(f"Error in ChatbotHealthView: {e}")
+            logger.error(f"Error in SimpleChatbotHealthView: {e}")
             return Response({
                 'status': 'unhealthy',
                 'error': str(e)

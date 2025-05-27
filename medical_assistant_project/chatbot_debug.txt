@@ -1,37 +1,100 @@
-Chatbot Debug Session - 2025-05-26 21:59:33
+Chatbot Debug Session - 2025-05-27 18:01:30
 ============================================================
 
-[2025-05-26 21:59:33] Starting chatbot debug session...
+[2025-05-27 18:01:30] Starting chatbot debug session...
 ==================================================
-[2025-05-26 21:59:33] Running test: Database Connection
+[2025-05-27 18:01:30] Running test: Database Connection
 ==================================================
-[2025-05-26 21:59:36] ✅ Database connection: Found 8 intents
+[2025-05-27 18:02:32] ❌ Database connection failed
+Error: connection to server at "aws-0-ap-southeast-1.pooler.supabase.com" (54.255.219.82), port 5432 failed: FATAL:  Max client connections reached
+
+Traceback:
+Traceback (most recent call last):
+  File "C:\Users\DELL\backend\venv\Lib\site-packages\django\db\backends\base\base.py", line 279, in ensure_connection
+    self.connect()
+    ~~~~~~~~~~~~^^
+  File "C:\Users\DELL\backend\venv\Lib\site-packages\django\utils\asyncio.py", line 26, in inner
+    return func(*args, **kwargs)
+  File "C:\Users\DELL\backend\venv\Lib\site-packages\django\db\backends\base\base.py", line 256, in connect
+    self.connection = self.get_new_connection(conn_params)
+                      ~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "C:\Users\DELL\backend\venv\Lib\site-packages\django\utils\asyncio.py", line 26, in inner
+    return func(*args, **kwargs)
+  File "C:\Users\DELL\backend\venv\Lib\site-packages\django\db\backends\postgresql\base.py", line 332, in get_new_connection
+    connection = self.Database.connect(**conn_params)
+  File "C:\Users\DELL\backend\venv\Lib\site-packages\psycopg2\__init__.py", line 135, in connect
+    conn = _connect(dsn, connection_factory=connection_factory, **kwasync)
+psycopg2.OperationalError: connection to server at "aws-0-ap-southeast-1.pooler.supabase.com" (54.255.219.82), port 5432 failed: FATAL:  Max client connections reached
+
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Users\DELL\backend\MedicalDocumentRAG\medical_assistant_project\debug_chatbot.py", line 96, in test_database_connection
+    count = ChatbotIntent.objects.count()
+  File "C:\Users\DELL\backend\venv\Lib\site-packages\django\db\models\manager.py", line 87, in manager_method
+    return getattr(self.get_queryset(), name)(*args, **kwargs)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "C:\Users\DELL\backend\venv\Lib\site-packages\django\db\models\query.py", line 604, in count
+    return self.query.get_count(using=self.db)
+           ~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^
+  File "C:\Users\DELL\backend\venv\Lib\site-packages\django\db\models\sql\query.py", line 644, in get_count
+    return obj.get_aggregation(using, {"__count": Count("*")})["__count"]
+           ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\DELL\backend\venv\Lib\site-packages\django\db\models\sql\query.py", line 626, in get_aggregation
+    result = compiler.execute_sql(SINGLE)
+  File "C:\Users\DELL\backend\venv\Lib\site-packages\django\db\models\sql\compiler.py", line 1620, in execute_sql
+    cursor = self.connection.cursor()
+  File "C:\Users\DELL\backend\venv\Lib\site-packages\django\utils\asyncio.py", line 26, in inner
+    return func(*args, **kwargs)
+  File "C:\Users\DELL\backend\venv\Lib\site-packages\django\db\backends\base\base.py", line 320, in cursor
+    return self._cursor()
+           ~~~~~~~~~~~~^^
+  File "C:\Users\DELL\backend\venv\Lib\site-packages\django\db\backends\base\base.py", line 296, in _cursor
+    self.ensure_connection()
+    ~~~~~~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\DELL\backend\venv\Lib\site-packages\django\utils\asyncio.py", line 26, in inner
+    return func(*args, **kwargs)
+  File "C:\Users\DELL\backend\venv\Lib\site-packages\django\db\backends\base\base.py", line 278, in ensure_connection
+    with self.wrap_database_errors:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\DELL\backend\venv\Lib\site-packages\django\db\utils.py", line 91, in __exit__
+    raise dj_exc_value.with_traceback(traceback) from exc_value
+  File "C:\Users\DELL\backend\venv\Lib\site-packages\django\db\backends\base\base.py", line 279, in ensure_connection
+    self.connect()
+    ~~~~~~~~~~~~^^
+  File "C:\Users\DELL\backend\venv\Lib\site-packages\django\utils\asyncio.py", line 26, in inner
+    return func(*args, **kwargs)
+  File "C:\Users\DELL\backend\venv\Lib\site-packages\django\db\backends\base\base.py", line 256, in connect
+    self.connection = self.get_new_connection(conn_params)
+                      ~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "C:\Users\DELL\backend\venv\Lib\site-packages\django\utils\asyncio.py", line 26, in inner
+    return func(*args, **kwargs)
+  File "C:\Users\DELL\backend\venv\Lib\site-packages\django\db\backends\postgresql\base.py", line 332, in get_new_connection
+    connection = self.Database.connect(**conn_params)
+  File "C:\Users\DELL\backend\venv\Lib\site-packages\psycopg2\__init__.py", line 135, in connect
+    conn = _connect(dsn, connection_factory=connection_factory, **kwasync)
+django.db.utils.OperationalError: connection to server at "aws-0-ap-southeast-1.pooler.supabase.com" (54.255.219.82), port 5432 failed: FATAL:  Max client connections reached
+
+
 ==================================================
-[2025-05-26 21:59:36] Running test: Serializers
+[2025-05-27 18:02:32] Running test: Serializers
 ==================================================
-[2025-05-26 21:59:55] ✅ Serializer test: Valid=True, Errors={}
+[2025-05-27 18:02:50] ✅ Serializer test: Valid=True, Errors={}
 ==================================================
-[2025-05-26 21:59:55] Running test: ChatbotEngine
+[2025-05-27 18:02:50] Running test: ChatbotEngine
 ==================================================
-[2025-05-26 21:59:55] ✅ ChatbotEngine imported successfully
+[2025-05-27 18:02:50] ✅ ChatbotEngine imported successfully
 ==================================================
-[2025-05-26 21:59:56] ✅ ChatbotEngine instantiated successfully
+[2025-05-27 18:03:44] ✅ ChatbotEngine instantiated successfully
 ==================================================
-[2025-05-26 21:59:57] ✅ Message processed successfully
+[2025-05-27 18:03:48] ✅ Message processed successfully
 Error: {'message': "I'm here to help you with:\n\n• Registering complaints\n• Checking complaint status\n• Submitting feedback\n• Uploading documents\n• Generating content\n• Creating audit questions\n\nWhat would you like to do?", 'response_type': 'menu', 'buttons': [{'text': 'Register Complaint', 'value': 'complaint_register', 'action': 'intent'}, {'text': 'Check Status', 'value': 'complaint_status', 'action': 'intent'}, {'text': 'Submit Feedback', 'value': 'feedback_submit', 'action': 'intent'}, {'text': 'Upload Document', 'value': 'document_upload', 'action': 'intent'}, {'text': 'Generate Content', 'value': 'content_generate', 'action': 'intent'}, {'text': 'Audit Questions', 'value': 'audit_questions', 'action': 'intent'}], 'quick_replies': ['Complaint', 'Feedback', 'Upload', 'Generate'], 'session_id': 'test-session', 'conversation_id': 'a1d0714e-990b-4a4b-b282-3b20d6c9ee48', 'intent_detected': 'general_inquiry', 'confidence_score': 0.3}
 Traceback:
 NoneType: None
 
 ==================================================
-[2025-05-26 21:59:57] Running test: ChatbotView
+[2025-05-27 18:03:48] Running test: ChatbotView
 ==================================================
-[2025-05-26 21:59:59] ✅ ChatbotMessageView imported successfully
-==================================================
-[2025-05-26 21:59:59] ✅ Test request created
-==================================================
-[2025-05-26 21:59:59] ✅ View instantiated
-==================================================
-[2025-05-26 22:00:01] ✅ View response: Status 200
-==================================================
-[2025-05-26 22:00:01] DEBUG SUMMARY: 4/4 tests passed 🎉 All tests passed - issue might be elsewhere
+[2025-05-27 18:04:00] ✅ ChatbotMessageView imported successfully
 ==================================================

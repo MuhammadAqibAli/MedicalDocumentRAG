@@ -20,13 +20,9 @@ from .views import (
     FeedbackViewSet,
     FeedbackAttachmentDownloadView,
     UserListView,
-    ChatbotMessageView,
-    ChatbotIntentDetectionView,
-    ChatbotActionView,
-    ChatbotQuickActionsView,
-    ChatbotConversationViewSet,
-    ChatbotIntentViewSet,
-    ChatbotHealthView
+    SimpleChatbotMessageView,
+    SimpleChatbotConversationView,
+    SimpleChatbotHealthView
 )
 
 router = DefaultRouter()
@@ -35,8 +31,7 @@ router.register(r'standard-types', StandardTypeViewSet, basename='standardtype')
 router.register(r'practices', PracticeViewSet, basename='practice')
 router.register(r'feedback-methods', FeedbackMethodViewSet, basename='feedbackmethod')
 router.register(r'feedback', FeedbackViewSet, basename='feedback')
-router.register(r'chatbot/conversations', ChatbotConversationViewSet, basename='chatbot-conversation')
-router.register(r'chatbot/intents', ChatbotIntentViewSet, basename='chatbot-intent')
+# Simple chatbot doesn't use viewsets
 
 urlpatterns = [
     path('upload/', DocumentUploadView.as_view(), name='document-upload'),
@@ -65,12 +60,11 @@ urlpatterns = [
     # Feedback attachment download endpoint
     path('feedback-attachments/<uuid:attachment_id>/download/', FeedbackAttachmentDownloadView.as_view(), name='feedback-attachment-download'),
 
-    # Chatbot endpoints
-    path('chatbot/message/', ChatbotMessageView.as_view(), name='chatbot-message'),
-    path('chatbot/intent-detect/', ChatbotIntentDetectionView.as_view(), name='chatbot-intent-detect'),
-    path('chatbot/handle-intent/', ChatbotActionView.as_view(), name='chatbot-handle-intent'),
-    path('chatbot/quick-actions/', ChatbotQuickActionsView.as_view(), name='chatbot-quick-actions'),
-    path('chatbot/health/', ChatbotHealthView.as_view(), name='chatbot-health'),
+    # Simple Chatbot endpoints
+    path('chatbot/message/', SimpleChatbotMessageView.as_view(), name='simple-chatbot-message'),
+    path('chatbot/conversations/', SimpleChatbotConversationView.as_view(), name='simple-chatbot-conversations'),
+    path('chatbot/conversations/<str:session_id>/', SimpleChatbotConversationView.as_view(), name='simple-chatbot-conversation-detail'),
+    path('chatbot/health/', SimpleChatbotHealthView.as_view(), name='simple-chatbot-health'),
 
     # User management endpoint
     path('users/', UserListView.as_view(), name='user-list'),
