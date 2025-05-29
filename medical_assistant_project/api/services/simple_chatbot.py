@@ -59,7 +59,64 @@ class SimpleChatbotService:
         """
         message_lower = message.lower().strip()
 
-        # Check each intent pattern
+        # Comprehensive button and text mapping for maximum compatibility
+        intent_mappings = [
+            # Exact button values (backend generated)
+            ('complaint_register', 'complaint_register', 0.95),
+            ('complaint_status', 'complaint_status', 0.95),
+            ('feedback_submit', 'feedback_submit', 0.95),
+            ('greeting', 'greeting', 0.95),
+            ('cancel', 'greeting', 0.95),
+
+            # Button text variations (frontend might send)
+            ('register complaint', 'complaint_register', 0.9),
+            ('check status', 'complaint_status', 0.9),
+            ('submit feedback', 'feedback_submit', 0.9),
+            ('main menu', 'greeting', 0.9),
+
+            # Quick reply variations
+            ('complaint', 'complaint_register', 0.85),
+            ('status', 'complaint_status', 0.85),
+            ('feedback', 'feedback_submit', 0.85),
+
+            # Single word variations
+            ('register', 'complaint_register', 0.8),
+            ('check', 'complaint_status', 0.8),
+            ('submit', 'feedback_submit', 0.8),
+
+            # Common greetings
+            ('hello', 'greeting', 0.8),
+            ('hi', 'greeting', 0.8),
+            ('help', 'greeting', 0.8),
+            ('start', 'greeting', 0.8),
+            ('menu', 'greeting', 0.8),
+            ('home', 'greeting', 0.8),
+
+            # Partial matches for robustness
+            ('register a complaint', 'complaint_register', 0.85),
+            ('file a complaint', 'complaint_register', 0.85),
+            ('submit a complaint', 'complaint_register', 0.85),
+            ('new complaint', 'complaint_register', 0.85),
+            ('complaint registration', 'complaint_register', 0.85),
+
+            ('check complaint status', 'complaint_status', 0.85),
+            ('complaint status', 'complaint_status', 0.85),
+            ('status check', 'complaint_status', 0.85),
+            ('check my complaint', 'complaint_status', 0.85),
+
+            ('submit feedback', 'feedback_submit', 0.85),
+            ('give feedback', 'feedback_submit', 0.85),
+            ('provide feedback', 'feedback_submit', 0.85),
+            ('feedback submission', 'feedback_submit', 0.85),
+            ('new feedback', 'feedback_submit', 0.85),
+        ]
+
+        # Check for exact and partial matches
+        for text, intent, confidence in intent_mappings:
+            if message_lower == text or text in message_lower:
+                return intent, confidence
+
+        # Check each intent pattern for natural language
         for intent, patterns in self.intent_patterns.items():
             for pattern in patterns:
                 if re.search(pattern, message_lower, re.IGNORECASE):
@@ -156,6 +213,9 @@ class SimpleChatbotService:
             return self._handle_complaint_form_step(message, current_step, form_data, session_id, user)
         elif current_flow == 'feedback_submit':
             return self._handle_feedback_form_step(message, current_step, form_data, session_id, user)
+        elif current_flow == 'complaint_status':
+            # Handle status check with reference number
+            return self._handle_complaint_status(message)
 
         # Fallback
         return self._handle_general_inquiry()
@@ -202,7 +262,7 @@ class SimpleChatbotService:
         elif intent == 'complaint_register':
             return self._handle_complaint_register(conversation_context, session_id)
         elif intent == 'complaint_status':
-            return self._handle_complaint_status(message)
+            return self._handle_complaint_status_init(session_id)
         elif intent == 'feedback_submit':
             return self._handle_feedback_submit(conversation_context, session_id)
         else:
@@ -248,40 +308,103 @@ class SimpleChatbotService:
             }
         }
 
+    def _handle_complaint_status_init(self, session_id: str) -> Dict[str, Any]:
+        """Initialize complaint status check flow."""
+        # Start the complaint status flow
+        self._update_conversation_context(session_id, {
+            'current_flow': 'complaint_status',
+            'current_step': 0,
+            'form_data': {}
+        })
+
+        return {
+            'message': "To check your complaint status, I'll need your complaint reference number. It usually starts with 'COMP-' followed by the date and a number (e.g., COMP-20250527-1234).\n\nPlease provide your reference number:",
+            'response_type': 'information_request',
+            'buttons': [
+                {'text': 'Register New Complaint', 'value': 'complaint_register', 'action': 'intent'},
+                {'text': 'Main Menu', 'value': 'greeting', 'action': 'intent'}
+            ],
+            'quick_replies': ['New complaint', 'Main menu'],
+            'intent_detected': 'complaint_status',
+            'confidence_score': 0.8,
+            'metadata': {
+                'current_field': 'reference_number',
+                'flow': 'complaint_status',
+                'step': 0
+            }
+        }
+
     def _handle_complaint_status(self, message: str) -> Dict[str, Any]:
         """Handle complaint status check intent."""
         # Check if message contains a reference number
-        ref_match = re.search(r'\b(COMP-\d{4}-\d+)\b', message, re.IGNORECASE)
+        ref_match = re.search(r'\b(COMP-\d{8}-\d+)\b', message, re.IGNORECASE)
 
         if ref_match:
             ref_number = ref_match.group(1).upper()
+            try:
+                from ..models import Complaint
+                complaint = Complaint.objects.filter(reference_number=ref_number).first()
+
+                if complaint:
+                    status_info = "Received" if complaint.received_date else "Submitted"
+                    resolved_status = "Resolved" if complaint.is_resolved else "In Progress"
+
+                    return {
+                        'message': f"✅ Found complaint: {ref_number}\n\n📋 **Title:** {complaint.title}\n📅 **Date:** {complaint.form_date}\n🏥 **Practice:** {complaint.practice or 'Not specified'}\n📊 **Status:** {status_info} - {resolved_status}\n\n{('✅ This complaint has been resolved.' if complaint.is_resolved else '⏳ This complaint is currently being processed.')}\n\nIs there anything else I can help you with?",
+                        'response_type': 'status_found',
+                        'buttons': [
+                            {'text': 'Register New Complaint', 'value': 'complaint_register', 'action': 'intent'},
+                            {'text': 'Submit Feedback', 'value': 'feedback_submit', 'action': 'intent'},
+                            {'text': 'Main Menu', 'value': 'greeting', 'action': 'intent'}
+                        ],
+                        'quick_replies': ['New complaint', 'Submit feedback', 'Main menu'],
+                        'intent_detected': 'complaint_status',
+                        'confidence_score': 0.9,
+                        'metadata': {
+                            'reference_number': ref_number,
+                            'complaint_found': True,
+                            'complaint_id': str(complaint.id),
+                            'status': resolved_status
+                        }
+                    }
+                else:
+                    return {
+                        'message': f"❌ I couldn't find a complaint with reference number {ref_number}.\n\nPlease check the reference number and try again, or I can help you register a new complaint.",
+                        'response_type': 'status_not_found',
+                        'buttons': [
+                            {'text': 'Try Another Reference', 'value': 'complaint_status', 'action': 'intent'},
+                            {'text': 'Register New Complaint', 'value': 'complaint_register', 'action': 'intent'},
+                            {'text': 'Main Menu', 'value': 'greeting', 'action': 'intent'}
+                        ],
+                        'quick_replies': ['Try again', 'New complaint', 'Main menu'],
+                        'intent_detected': 'complaint_status',
+                        'confidence_score': 0.9,
+                        'metadata': {
+                            'reference_number': ref_number,
+                            'complaint_found': False
+                        }
+                    }
+            except Exception as e:
+                return {
+                    'message': f"❌ Sorry, I encountered an error while checking the complaint status: {str(e)}\n\nPlease try again or contact support.",
+                    'response_type': 'error',
+                    'buttons': [
+                        {'text': 'Try Again', 'value': 'complaint_status', 'action': 'intent'},
+                        {'text': 'Main Menu', 'value': 'greeting', 'action': 'intent'}
+                    ],
+                    'quick_replies': ['Try again', 'Main menu'],
+                    'intent_detected': 'complaint_status',
+                    'confidence_score': 0.7
+                }
+        else:
             return {
-                'message': f"I'll check the status of complaint {ref_number} for you. Please wait while I retrieve the information...",
-                'response_type': 'status_check',
+                'message': "To check your complaint status, I'll need your complaint reference number. It usually starts with 'COMP-' followed by the date and a number (e.g., COMP-20250527-1234).\n\nPlease provide your reference number:",
+                'response_type': 'information_request',
                 'buttons': [
-                    {'text': 'View Details', 'value': f'view_complaint_{ref_number}', 'action': 'redirect', 'url': f'/complaints/search?ref={ref_number}'},
                     {'text': 'Register New Complaint', 'value': 'complaint_register', 'action': 'intent'},
                     {'text': 'Main Menu', 'value': 'greeting', 'action': 'intent'}
                 ],
-                'quick_replies': ['View details', 'New complaint'],
-                'intent_detected': 'complaint_status',
-                'confidence_score': 0.9,
-                'metadata': {
-                    'reference_number': ref_number,
-                    'api_endpoint': f'/api/complaints/?reference_number={ref_number}',
-                    'method': 'GET'
-                }
-            }
-        else:
-            return {
-                'message': "To check your complaint status, I'll need your complaint reference number. It usually starts with 'COMP-' followed by the year and a number (e.g., COMP-2024-001).\n\nPlease provide your reference number, or I can help you find it using other information.",
-                'response_type': 'information_request',
-                'buttons': [
-                    {'text': 'I have reference number', 'value': 'provide_reference', 'action': 'input'},
-                    {'text': 'Find by patient name', 'value': 'find_by_name', 'action': 'redirect', 'url': '/complaints/search'},
-                    {'text': 'Main Menu', 'value': 'greeting', 'action': 'intent'}
-                ],
-                'quick_replies': ['I have the reference', 'Help me find it'],
+                'quick_replies': ['New complaint', 'Main menu'],
                 'intent_detected': 'complaint_status',
                 'confidence_score': 0.7
             }
@@ -464,8 +587,8 @@ class SimpleChatbotService:
                 email=form_data.get('email', '').strip(),
                 form_date=date.today(),
                 reference_number=reference_number,
-                is_acknowledged=False,
-                is_visible_to_users=True
+                is_acknowledged=False
+                # is_visible_to_users defaults to True in the model
             )
 
             complaint_id = complaint.reference_number
@@ -511,19 +634,20 @@ class SimpleChatbotService:
             from ..models import Feedback, Practice
             from django.contrib.auth.models import User as AuthUser
 
-            # Get or create practice
+            # Get or create practice (required field)
             practice_name = form_data.get('practice', '').strip()
-            practice = None
-            if practice_name:
-                practice, created = Practice.objects.get_or_create(
-                    name=practice_name,
-                    defaults={
-                        'address': '',
-                        'contact_number': '',  # Correct field name
-                        'email': '',
-                        'is_active': True
-                    }
-                )
+            if not practice_name:
+                practice_name = 'Unknown Practice'  # Default if not provided
+
+            practice, created = Practice.objects.get_or_create(
+                name=practice_name,
+                defaults={
+                    'address': '',
+                    'contact_number': '',  # Correct field name
+                    'email': '',
+                    'is_active': True
+                }
+            )
 
             # Get or create a default user for feedback submission if no user provided
             if not user:
@@ -544,8 +668,7 @@ class SimpleChatbotService:
                 feedback_details=form_data.get('feedback_details', '').strip(),
                 email=form_data.get('email', '').strip(),
                 form_date=date.today(),
-                submitter=user,
-                is_visible_to_users=True
+                submitter=user
             )
 
             feedback_id = feedback.reference_number
